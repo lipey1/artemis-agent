@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Artemis
+GenericName=Artemis Desktop
+Comment=Artemis Desktop agent
+Exec=env HERMES_DESKTOP_APP_NAME=Artemis Artemis --no-sandbox --disable-gpu
+Icon=artemis
+Terminal=false
+Categories=Utility;Development;
+StartupNotify=true
+StartupWMClass=Artemis
