@@ -1,6 +1,6 @@
 # Building installers
 
-From the Hermes Agent desktop app directory (Node.js >= 22):
+From the Artemis agent desktop app directory (Node.js >= 22):
 
 ```bash
 npm run build
@@ -14,6 +14,12 @@ Publish artifacts via GitHub Releases (files often exceed git size limits).
 Current public packages live at:
 
 https://github.com/lipey1/artemis-desktop/releases/latest
+
+After building or branding an engine tree, retarget update checks:
+
+```bash
+python3 scripts/retarget-updates.py /path/to/artemis-agent
+```
 
 Mobile companion:
 

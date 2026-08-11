@@ -15,7 +15,10 @@ release/mac-arm64/
 release/Artemis-win-portable/
 release/builder-*.yml
 release/builder-*.yaml
-release/hermes-*
+release/Artemis-*
+release/artemis-*
 *.asar
 .DS_Store
 node_modules/
+
+scripts/
