@@ -1020,7 +1020,7 @@ if (IS_WINDOWS) {
 // the seed here just covers the first open and any non-menu invocation path.
 app.setAboutPanelOptions({
   applicationName: APP_NAME,
-  applicationVersion: resolveArtemisVersion(),
+  applicationVersion: resolveDesktopVersion(),
   copyright: 'Copyright © 2026 Artemis / lipey1'
 })
 
@@ -11794,11 +11794,15 @@ ipcMain.handle('artemis:updates:branch:set', async (_event, name) => {
   return { branch }
 })
 
-// Resolve the canonical Artemis version (the one `release.py` bumps in
-// artemis_cli/__init__.py + pyproject.toml) so the desktop About panel shows the
-// real Artemis version instead of the Electron app's own package.json version,
-// which historically drifted (stuck at 0.0.2). Falls back to app.getVersion()
-// when the source tree can't be read (e.g. a packaged build without the repo).
+// Desktop shell version from package.json / Electron. The agent engine version
+// (artemis_cli __version__) is separate and can lag or lead; About / statusbar
+// should show what this .deb / AppImage actually is.
+function resolveDesktopVersion() {
+  return app.getVersion()
+}
+
+// Agent / engine version from the vendored or installed artemis_cli tree. Used
+// when the UI wants to show both numbers; falls back to the desktop version.
 function resolveArtemisVersion() {
   try {
     const root = resolveUpdateRoot()
@@ -11816,24 +11820,25 @@ function resolveArtemisVersion() {
     // Fall through to the Electron app version below.
   }
 
-  return app.getVersion()
+  return resolveDesktopVersion()
 }
 
-// Re-resolve the live Artemis version and push it into the native About panel
-// just before showing it, so an in-place `artemis update` is reflected without
-// an app restart. macOS only — `showAboutPanel()` is a no-op elsewhere, and the
-// other platforms don't use this menu item.
+// Re-resolve the live Desktop version and push it into the native About panel
+// just before showing it, so an in-place update is reflected without an app
+// restart. macOS only — `showAboutPanel()` is a no-op elsewhere, and the other
+// platforms don't use this menu item.
 function showAboutPanelFresh() {
   app.setAboutPanelOptions({
     applicationName: APP_NAME,
-    applicationVersion: resolveArtemisVersion(),
+    applicationVersion: resolveDesktopVersion(),
     copyright: 'Copyright © 2026 Artemis / lipey1'
   })
   app.showAboutPanel()
 }
 
 ipcMain.handle('artemis:version', async () => ({
-  appVersion: resolveArtemisVersion(),
+  appVersion: resolveDesktopVersion(),
+  agentVersion: resolveArtemisVersion(),
   electronVersion: process.versions.electron,
   nodeVersion: process.versions.node,
   platform: process.platform,

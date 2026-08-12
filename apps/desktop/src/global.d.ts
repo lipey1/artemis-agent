@@ -376,6 +376,8 @@ export interface ArtemisTerminalExit {
 
 export interface DesktopVersionInfo {
   appVersion: string
+  /** Agent / engine version when readable; may differ from the Desktop shell. */
+  agentVersion?: string
   electronVersion: string
   nodeVersion: string
   platform: string
