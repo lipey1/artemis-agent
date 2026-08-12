@@ -1,0 +1,7 @@
+allowBuilds:
+  electron: true
+  electron-winstaller: true
+  esbuild: true
+  get-windows: true
+  node-pty: true
+  unicode-animations: true

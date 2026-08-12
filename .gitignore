@@ -35,3 +35,14 @@ venv/
 .env
 .env.local
 .env.*.local
+
+# Local pnpm at repo root (lock lives in apps/desktop/)
+/pnpm-lock.yaml
+
+# Python / agent local build artifacts
+.bytecode-fingerprint
+*.egg-info/
+artemis_agent.egg-info/
+
+# Electron TypeScript project references build output
+apps/desktop/build/electron-types/
