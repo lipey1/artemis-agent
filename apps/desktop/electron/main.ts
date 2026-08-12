@@ -5467,11 +5467,20 @@ function configureAppIcon() {
     return
   }
 
-  // macOS dock icon is also set per-window in createWindow(); Linux GNOME/Ubuntu
-  // dock reads the app/window icon via _NET_WM_ICON and needs an explicit
-  // app.setIcon plus a real filesystem path (see APP_ICON_PATHS).
+  // macOS dock icon is also set per-window in createWindow().
+  // Electron's App has no setIcon() on Linux — only BrowserWindow `{ icon }`
+  // (and optional nativeImage). Calling app.setIcon threw TypeError, rejected
+  // whenReady before createWindow(), and left a headless process: first dock
+  // click did nothing visible; second click hit second-instance and opened.
   if (IS_LINUX) {
-    app.setIcon(icon)
+    try {
+      const maybeSetIcon = (app as { setIcon?: (path: string) => void }).setIcon
+      if (typeof maybeSetIcon === 'function') {
+        maybeSetIcon.call(app, icon)
+      }
+    } catch (err) {
+      rememberLog(`[boot] app.setIcon skipped: ${err instanceof Error ? err.message : String(err)}`)
+    }
   }
 }
 
@@ -12231,7 +12240,16 @@ app.whenReady().then(() => {
   // it without the renderer visiting Settings. A failed registration is logged
   // here and surfaced in Settings via the IPC state (never silent).
   applyQuickEntrySettings(readQuickEntrySettings())
-  configureAppIcon()
+
+  // Create the window first so a cosmetic icon failure can never leave us
+  // running headless (first click no window / second click finally opens).
+  createWindow()
+
+  try {
+    configureAppIcon()
+  } catch (err) {
+    rememberLog(`[boot] configureAppIcon failed: ${err instanceof Error ? err.message : String(err)}`)
+  }
 
   if (IS_MAC) {
     const reposition = () => wakeIndicatorController.reposition()
@@ -12242,8 +12260,6 @@ app.whenReady().then(() => {
 
     screen.on('display-removed', reposition)
   }
-
-  createWindow()
 
   // Win/Linux cold start: the launching artemis:// URL is in our own argv.
   const _coldStartLink = _extractDeepLink(process.argv)
