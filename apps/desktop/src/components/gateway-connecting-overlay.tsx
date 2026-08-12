@@ -175,7 +175,7 @@ export function GatewayConnectingOverlay() {
           leaving ? 'translate-y-2 opacity-0 saturate-0' : 'translate-y-0 opacity-100 saturate-100'
         )}
       >
-        <BrandMark className="size-20 shadow-sm" />
+        <BrandMark className="size-20" />
         <Loader2 className="size-6 animate-spin text-primary/70" />
         <DecodeText
           active={phase === 'live' && (previewing || connecting)}

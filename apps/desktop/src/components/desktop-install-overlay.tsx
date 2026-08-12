@@ -568,7 +568,7 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
     return (
       <div className="fixed inset-0 z-(--z-setup) flex items-center justify-center bg-background/95 p-4 backdrop-blur-md">
         <div className="flex w-full max-w-md flex-col items-center rounded-2xl border border-(--stroke-nous) bg-card px-8 py-10 shadow-nous">
-          <BrandMark className="size-24 shrink-0 shadow-sm" />
+          <BrandMark className="size-24 shrink-0" />
           <h2 className="mt-6 text-center text-xl font-semibold tracking-tight">
             {state.active ? copy.settingUpTitle : copy.finishingTitle}
           </h2>
