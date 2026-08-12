@@ -13,7 +13,18 @@
  */
 
 const OFFICIAL_REPO_HTTPS_URL = 'https://github.com/lipey1/artemis-desktop.git'
+/** host/owner/repo form used to compare git remotes (SSH vs HTTPS). */
 const OFFICIAL_REPO_CANONICAL = 'github.com/lipey1/artemis-desktop'
+/** owner/repo slug for raw.githubusercontent.com and API paths (no host prefix). */
+const OFFICIAL_REPO_SLUG = 'lipey1/artemis-desktop'
+
+function officialRepoRawUrl(relativePath: string, ref: string): string {
+  const segment = String(relativePath || '')
+    .replace(/^\/+/, '')
+    .replace(/\/+$/, '')
+
+  return `https://raw.githubusercontent.com/${OFFICIAL_REPO_SLUG}/${ref}/${segment}`
+}
 
 // Normalize common GitHub remote URL forms to `host/owner/repo` (lowercased,
 // no trailing slash, no .git suffix) so SSH and HTTPS forms of the same repo
@@ -62,4 +73,12 @@ function isOfficialSshRemote(url) {
   return isSshRemote(url) && canonicalGitHubRemote(url) === OFFICIAL_REPO_CANONICAL
 }
 
-export { canonicalGitHubRemote, isOfficialSshRemote, isSshRemote, OFFICIAL_REPO_CANONICAL, OFFICIAL_REPO_HTTPS_URL }
+export {
+  canonicalGitHubRemote,
+  isOfficialSshRemote,
+  isSshRemote,
+  officialRepoRawUrl,
+  OFFICIAL_REPO_CANONICAL,
+  OFFICIAL_REPO_HTTPS_URL,
+  OFFICIAL_REPO_SLUG
+}

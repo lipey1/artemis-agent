@@ -23,8 +23,10 @@ import {
   canonicalGitHubRemote,
   isOfficialSshRemote,
   isSshRemote,
+  officialRepoRawUrl,
   OFFICIAL_REPO_CANONICAL,
-  OFFICIAL_REPO_HTTPS_URL
+  OFFICIAL_REPO_HTTPS_URL,
+  OFFICIAL_REPO_SLUG
 } from './update-remote'
 
 test('canonicalGitHubRemote normalizes SSH and HTTPS forms to the same value', () => {
@@ -76,4 +78,18 @@ test('isOfficialSshRemote does NOT match forks, other hosts, or HTTPS', () => {
 test('OFFICIAL_REPO_HTTPS_URL canonicalizes to OFFICIAL_REPO_CANONICAL', () => {
   // Invariant: the URL we substitute in must be the same repo we detect.
   assert.equal(canonicalGitHubRemote(OFFICIAL_REPO_HTTPS_URL), OFFICIAL_REPO_CANONICAL)
+})
+
+test('OFFICIAL_REPO_SLUG is owner/repo without a github.com host prefix', () => {
+  assert.equal(OFFICIAL_REPO_SLUG, 'lipey1/artemis-desktop')
+  assert.doesNotMatch(OFFICIAL_REPO_SLUG, /github\.com/)
+})
+
+test('officialRepoRawUrl builds raw.githubusercontent.com paths from the slug', () => {
+  const sha = '059ce7401c7c65830842786b19ddf5852c67a55e'
+  assert.equal(
+    officialRepoRawUrl('scripts/install.sh', sha),
+    `https://raw.githubusercontent.com/${OFFICIAL_REPO_SLUG}/${sha}/scripts/install.sh`
+  )
+  assert.doesNotMatch(officialRepoRawUrl('scripts/install.sh', sha), /raw\.githubusercontent\.com\/github\.com\//)
 })
