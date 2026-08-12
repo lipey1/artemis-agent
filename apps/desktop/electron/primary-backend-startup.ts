@@ -77,7 +77,7 @@ export async function runPrimaryBackendStartup<Backend, RuntimeBackend, Remote, 
   try {
     return { kind: 'local', backend: await ensureLocalRuntime(backend) }
   } catch (error) {
-    if (!(error instanceof FirstRunRemoteAppliedError) && !(error as { firstRunRemoteApplied?: boolean })?.firstRunRemoteApplied) {
+    if (!(error instanceof FirstRunRemoteAppliedError)) {
       throw error
     }
 
