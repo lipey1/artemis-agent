@@ -56,7 +56,6 @@ import {
   buildGatewayWsUrlWithTicket,
   connectionScopeKey,
   cookiesHaveLiveSession,
-  cookiesHavePrivySession,
   cookiesHaveSession,
   gatewayTicketFailure,
   gatewayWsUrlIpcResult,
@@ -6083,20 +6082,7 @@ async function clearOauthSession(baseUrl) {
 // the window first. The window navigates through the IDP and back to
 // /auth/callback, which sets the session cookies on the partition; we poll the
 // cookie jar rather than try to read the HttpOnly value.
-//
-// `silent` selects the URL the window loads, which decides interactive-vs-silent:
-//   - silent=false (default): load ``/login`` — the public interstitial that
-//     renders the "Log in with X" provider chooser. This is the interactive
-//     remote-gateway login the settings UI drives.
-//   - silent=true: load the PROTECTED root ``/`` instead. ``/login`` is a public
-//     route, so loading it NEVER triggers the gate's auto-SSO and always shows
-//     the chooser. Loading a protected page with no session cookie makes the
-//     gate run ``_auto_sso_response``: single registered provider + a live
-//     portal session in this partition → a silent 302 through
-//     ``/auth/login`` → portal ``/oauth/authorize`` (auto-approves org members)
-//     → ``/auth/callback``, which sets the gateway cookie with NO interactive
-//     prompt. This is the per-agent cloud cascade (decisions.md Q5).
-function openOauthLoginWindow(baseUrl, { silent = false } = {}) {
+function openOauthLoginWindow(baseUrl) {
   return new Promise((resolve, reject) => {
     if (!app.isReady()) {
       reject(new Error('Desktop is not ready to start an OAuth login.'))
@@ -6115,7 +6101,6 @@ function openOauthLoginWindow(baseUrl, { silent = false } = {}) {
     let settled = false
     let win = null
     let pollTimer = null
-    let revealTimer = null
 
     const finish = err => {
       if (settled) {
@@ -6126,10 +6111,6 @@ function openOauthLoginWindow(baseUrl, { silent = false } = {}) {
 
       if (pollTimer) {
         clearInterval(pollTimer)
-      }
-
-      if (revealTimer) {
-        clearTimeout(revealTimer)
       }
 
       try {
@@ -6161,14 +6142,8 @@ function openOauthLoginWindow(baseUrl, { silent = false } = {}) {
       win = new BrowserWindow({
         width: 520,
         height: 720,
-        title: silent ? 'Connecting to Artemis Cloud agent…' : 'Sign in to Artemis gateway',
+        title: 'Sign in to Artemis gateway',
         autoHideMenuBar: true,
-        // Silent cascade: start HIDDEN. The auto-SSO 302 chain completes in
-        // well under a second, so the window normally never needs to show. We
-        // only reveal it as a fallback if the cascade DOESN'T complete quickly
-        // (e.g. the portal session lapsed and the gate fell through to the
-        // interactive chooser) — see the reveal timer below.
-        show: !silent,
         webPreferences: {
           contextIsolation: true,
           nodeIntegration: false,
@@ -6195,23 +6170,6 @@ function openOauthLoginWindow(baseUrl, { silent = false } = {}) {
     installWindowRendererLifecycle(win, { kind: 'oauth', callbacks: { log: rememberLog } })
     pollTimer = setInterval(() => void checkCookie(), 750)
 
-    // Silent-mode reveal fallback: if the cascade hasn't settled shortly, the
-    // auto-SSO didn't go through silently (no portal session, multi-provider,
-    // loop-guard tripped, etc.) and the window is now showing an interactive
-    // page. Reveal it so the user can complete sign-in manually rather than
-    // staring at nothing. Cleared on finish().
-    if (silent && win) {
-      revealTimer = setTimeout(() => {
-        try {
-          if (!settled && win && !win.isDestroyed() && !win.isVisible()) {
-            win.show()
-          }
-        } catch {
-          // window torn down
-        }
-      }, 2500)
-    }
-
     win.on('closed', () => {
       if (!settled) {
         finish(new Error('Login window closed before authentication completed.'))
@@ -6221,11 +6179,8 @@ function openOauthLoginWindow(baseUrl, { silent = false } = {}) {
     // ``next`` is intentionally omitted: the gateway lands on ``/`` after
     // login, which is a valid authenticated page that sets the cookies. We
     // only care that the cookie jar is populated.
-    //
-    // silent=true loads the protected root so the gate auto-SSOs (no chooser);
-    // silent=false loads the public ``/login`` chooser for interactive sign-in.
     const normalizedBase = normalizeRemoteBaseUrl(baseUrl)
-    const loginUrl = silent ? `${normalizedBase}/` : `${normalizedBase}/login`
+    const loginUrl = `${normalizedBase}/login`
     win.loadURL(loginUrl).catch(error => {
       finish(error instanceof Error ? error : new Error(String(error)))
     })
@@ -6543,317 +6498,6 @@ async function freshGatewayWsUrl(profile) {
   return connection.wsUrl
 }
 
-// --- Artemis Cloud discovery + silent per-agent sign-in (cloud-auto-discovery
-// Phase 3) ---------------------------------------------------------------
-//
-// The "cloud" connection mode lets a user sign in to the Nous portal ONCE in
-// the OAuth session partition, then (a) discover their hosted agents and (b)
-// connect to any of them with no second interactive sign-in. Both ride the one
-// portal session cookie living in `persist:artemis-remote-oauth`:
-//   - discovery  → GET {portal}/api/agents over the partition-bound net; the
-//     portal session cookie authenticates it (NAS Phase 2.5 accepts the cookie).
-//   - cascade    → opening an agent's own /login in the same partition hits the
-//     portal's silent auto-approve (org member, existing session) and 302s back
-//     with that agent's session cookie — no prompt. Each agent still completes
-//     its own PKCE exchange; SSO removes the human click, not a security check.
-
-// Canonical Nous portal base URL, overridable for staging/dev. Mirrors the CLI
-// convention (artemis_cli/auth.py DEFAULT_NOUS_PORTAL_URL + the same env names)
-// so a single override flips every Artemis surface to the same portal.
-const DEFAULT_NOUS_PORTAL_URL = 'https://portal.nousresearch.com'
-
-function resolvePortalBaseUrl() {
-  const raw = process.env.ARTEMIS_PORTAL_BASE_URL || process.env.NOUS_PORTAL_BASE_URL || DEFAULT_NOUS_PORTAL_URL
-
-  return String(raw).trim().replace(/\/+$/, '')
-}
-
-// Whether the OAuth partition currently holds a live Nous portal session — the
-// credential that powers both discovery and the silent cascade. The portal
-// authenticates via PRIVY, not the Artemis gateway session cookies, so this
-// checks for the `privy-token` cookie on the portal host (NOT
-// hasLiveOauthSession, which looks for artemis_session_at/rt that the portal
-// never sets). See connection-config.ts cookiesHavePrivySession.
-async function hasLivePortalSession() {
-  const sess = getOauthSession()
-
-  if (!sess) {
-    return false
-  }
-
-  const portalBaseUrl = resolvePortalBaseUrl()
-  const parsed = new URL(portalBaseUrl)
-
-  try {
-    const cookies = await sess.cookies.get({ url: portalBaseUrl })
-
-    return cookiesHavePrivySession(cookies)
-  } catch {
-    try {
-      const cookies = await sess.cookies.get({ domain: parsed.hostname })
-
-      return cookiesHavePrivySession(cookies)
-    } catch {
-      return false
-    }
-  }
-}
-
-// Drive a one-time interactive portal sign-in in the OAuth partition. Unlike
-// openOauthLoginWindow (which targets a gateway's /login), this lands on the
-// portal itself so the resulting session cookie is portal-scoped — the cookie
-// that authenticates discovery AND is reused for every silent per-agent
-// cascade. Resolves once the portal session cookie appears.
-function openPortalLoginWindow() {
-  const portalBaseUrl = resolvePortalBaseUrl()
-
-  return new Promise((resolve, reject) => {
-    if (!app.isReady()) {
-      reject(new Error('Desktop is not ready to start a Artemis Cloud sign-in.'))
-
-      return
-    }
-
-    const sess = getOauthSession()
-
-    if (!sess) {
-      reject(new Error('OAuth session partition is unavailable.'))
-
-      return
-    }
-
-    let settled = false
-    let win = null
-    let pollTimer = null
-
-    const finish = err => {
-      if (settled) {
-        return
-      }
-
-      settled = true
-
-      if (pollTimer) {
-        clearInterval(pollTimer)
-      }
-
-      try {
-        if (win && !win.isDestroyed()) {
-          win.destroy()
-        }
-      } catch {
-        // window already torn down
-      }
-
-      if (err) {
-        reject(err)
-      } else {
-        resolve({ portalBaseUrl, ok: true })
-      }
-    }
-
-    const checkCookie = async () => {
-      if (settled) {
-        return
-      }
-
-      // A live portal (Privy) session cookie means sign-in completed.
-      if (await hasLivePortalSession()) {
-        finish(null)
-      }
-    }
-
-    try {
-      win = new BrowserWindow({
-        width: 520,
-        height: 720,
-        title: 'Sign in to Artemis Cloud',
-        autoHideMenuBar: true,
-        webPreferences: {
-          contextIsolation: true,
-          nodeIntegration: false,
-          sandbox: true,
-          session: sess,
-          webSecurity: true
-        }
-      })
-    } catch (error) {
-      finish(error instanceof Error ? error : new Error(String(error)))
-
-      return
-    }
-
-    win.webContents.on('did-navigate', () => void checkCookie())
-    win.webContents.on('did-redirect-navigation', () => void checkCookie())
-    win.webContents.on('did-frame-navigate', () => void checkCookie())
-    // Log-only lifecycle diagnostics, same rationale as the OAuth window:
-    // a crashed portal sign-in renderer never settles the promise, so the
-    // failure would otherwise leave no trace in desktop.log (#81290
-    // follow-up).
-    installWindowRendererLifecycle(win, { kind: 'portal', callbacks: { log: rememberLog } })
-    pollTimer = setInterval(() => void checkCookie(), 750)
-
-    win.on('closed', () => {
-      if (!settled) {
-        finish(new Error('Sign-in window closed before authentication completed.'))
-      }
-    })
-
-    // Land on the portal root; any authenticated portal page sets the session
-    // cookie. We only care that the partition cookie jar is populated.
-    win.loadURL(portalBaseUrl).catch(error => {
-      finish(error instanceof Error ? error : new Error(String(error)))
-    })
-  })
-}
-
-// Discover the hosted (Artemis Cloud) agents the signed-in user can see. Calls
-// the NAS trimmed-summary endpoint over the partition-bound net, so the portal
-// session cookie is attached automatically (no bearer needed — NAS accepts the
-// cookie). Returns { agents } on success, or { needsOrgSelection: true, orgs }
-// when the user belongs to multiple orgs and hasn't picked one yet (NAS 409
-// org_selection_required). Pass `org` (a slug/id from a prior org list) to
-// scope discovery to that org. Throws a needsCloudLogin-tagged error when no
-// portal session is present.
-async function discoverCloudAgents(org?: string) {
-  const portalBaseUrl = resolvePortalBaseUrl()
-
-  if (!(await hasLivePortalSession())) {
-    const err = new Error(
-      'You are not signed in to Artemis Cloud. Open Settings → Gateway, choose Artemis Cloud, and sign in.'
-    ) as any
-
-    err.needsCloudLogin = true
-    throw err
-  }
-
-  const orgQuery = org ? `?org=${encodeURIComponent(org)}` : ''
-  let body
-
-  try {
-    body = (await fetchJsonViaOauthSession(`${portalBaseUrl}/api/agents${orgQuery}`, {
-      method: 'GET',
-      timeoutMs: 15_000
-    })) as any
-  } catch (error) {
-    // A 401 means the portal session lapsed between the liveness check and the
-    // call — surface it as a re-login, not a generic failure.
-    if (error && error.statusCode === 401) {
-      const err = new Error('Your Artemis Cloud session has expired. Open Settings → Gateway and sign in again.') as any
-      err.needsCloudLogin = true
-      err.cause = error
-      throw err
-    }
-
-    // A 409 means we're a multi-org user who hasn't picked an org. The body
-    // carries the user's org list; surface it so the renderer shows a picker
-    // and re-calls discovery with the chosen org. (fetchJsonViaOauthSession
-    // throws on >=400 with err.statusCode + err.message "409: <json body>".)
-    if (error && error.statusCode === 409) {
-      const orgs = parseOrgSelectionError(error)
-
-      if (orgs) {
-        return { needsOrgSelection: true, orgs }
-      }
-    }
-
-    throw error
-  }
-
-  return { agents: trimCloudAgents(body), org: trimCloudOrg(body?.org) }
-}
-
-// Project a NAS response org ({ id, slug, name, isPersonal }) to the trimmed
-// shape the renderer persists, or null when absent/malformed.
-function trimCloudOrg(org) {
-  if (!org || typeof org !== 'object' || typeof org.id !== 'string') {
-    return null
-  }
-
-  return {
-    id: org.id,
-    slug: typeof org.slug === 'string' ? org.slug : null,
-    name: typeof org.name === 'string' ? org.name : org.id,
-    isPersonal: Boolean(org.isPersonal),
-    role: typeof org.role === 'string' ? org.role : 'MEMBER'
-  }
-}
-
-// Extract the org list from a 409 org_selection_required error body. The error
-// message is "409: <raw json>" (see fetchJsonViaOauthSession); parse defensively
-// and return null if it isn't the shape we expect (caller then rethrows).
-function parseOrgSelectionError(error) {
-  const msg = String(error?.message || '')
-  const jsonStart = msg.indexOf('{')
-
-  if (jsonStart < 0) {
-    return null
-  }
-
-  let parsed
-
-  try {
-    parsed = JSON.parse(msg.slice(jsonStart))
-  } catch {
-    return null
-  }
-
-  if (parsed?.error !== 'org_selection_required' || !Array.isArray(parsed.orgs)) {
-    return null
-  }
-
-  return parsed.orgs
-    .filter(o => o && typeof o === 'object' && typeof o.id === 'string')
-    .map(o => ({
-      id: o.id,
-      slug: typeof o.slug === 'string' ? o.slug : null,
-      name: typeof o.name === 'string' ? o.name : o.id,
-      isPersonal: Boolean(o.isPersonal),
-      role: typeof o.role === 'string' ? o.role : 'MEMBER'
-    }))
-}
-
-// Project NAS's agent rows to the trimmed DTO the renderer consumes.
-function trimCloudAgents(body) {
-  const agents = Array.isArray(body?.agents) ? body.agents : []
-
-  return agents
-    .filter(a => a && typeof a === 'object' && typeof a.id === 'string')
-    .map(a => ({
-      id: a.id,
-      name: typeof a.name === 'string' ? a.name : a.id,
-      status: typeof a.status === 'string' ? a.status : 'unknown',
-      dashboardUrl: typeof a.dashboardUrl === 'string' ? a.dashboardUrl : null,
-      dashboardGatewayState: typeof a.dashboardGatewayState === 'string' ? a.dashboardGatewayState : 'unknown'
-    }))
-}
-
-// Silent per-agent sign-in: open the selected agent dashboard's /login in the
-// SAME OAuth partition. Because the user already holds a live portal session
-// there, the agent's /oauth/authorize auto-approves (org member) and 302s back,
-// setting that agent's gateway session cookie WITHOUT a second interactive
-// prompt. Reuses openOauthLoginWindow — the window self-closes the instant the
-// agent's session cookie lands (a silent flow finishes in well under a second;
-// if the portal session were absent it would fall through to an interactive
-// login, which the discovery gate already prevents). Returns once the agent's
-// gateway session cookie is present.
-async function cloudAgentSilentSignIn(dashboardUrl) {
-  const baseUrl = normalizeRemoteBaseUrl(dashboardUrl)
-
-  // Pre-req: a live portal session must exist, or this would surface an
-  // interactive prompt rather than a silent cascade. Discovery already gates on
-  // this, but a selection can arrive after the session lapsed.
-  if (!(await hasLivePortalSession())) {
-    const err = new Error('Your Artemis Cloud session has expired. Sign in to Artemis Cloud again.') as any
-    err.needsCloudLogin = true
-    throw err
-  }
-
-  await openOauthLoginWindow(baseUrl, { silent: true })
-
-  return { baseUrl, connected: await hasOauthSessionCookie(baseUrl) }
-}
-
 function encryptDesktopSecret(value) {
   return encryptDesktopSecretStrict(value, safeStorage)
 }
@@ -6913,15 +6557,15 @@ function sanitizeConnectionProfiles(raw: Record<string, any>) {
       continue
     }
 
+    const rawMode = entry.mode === 'cloud' ? 'remote' : entry.mode
     const cleaned: {
-      mode: 'remote' | 'local' | 'cloud'
+      mode: 'remote' | 'local'
       url?: string
       authMode?: string
       token?: object
-      org?: string
       savedSsh?: object
     } = {
-      mode: modeIsRemoteLike(entry.mode) ? entry.mode : 'local'
+      mode: modeIsRemoteLike(rawMode) ? 'remote' : 'local'
     }
 
     if (cleaned.mode === 'local') {
@@ -6942,16 +6586,6 @@ function sanitizeConnectionProfiles(raw: Record<string, any>) {
 
     if ((entry as any).token && typeof entry.token === 'object') {
       cleaned.token = entry.token
-    }
-
-    // Preserve the Artemis Cloud org tag on cloud-mode entries so Settings can
-    // reopen into the same org for a per-profile cloud connection.
-    if (cleaned.mode === 'cloud') {
-      const org = String(entry.org || '').trim()
-
-      if (org) {
-        cleaned.org = org
-      }
     }
 
     out[name] = cleaned
@@ -6989,7 +6623,12 @@ function readDesktopConnectionConfig() {
       // backward compatibility with configs written before OAuth support.
       remote.authMode = remote.authMode === 'oauth' ? 'oauth' : 'token'
       config = {
-        mode: parsed.mode === 'ssh' ? 'ssh' : modeIsRemoteLike(parsed.mode) ? parsed.mode : 'local',
+        mode:
+          parsed.mode === 'ssh'
+            ? 'ssh'
+            : parsed.mode === 'cloud' || modeIsRemoteLike(parsed.mode)
+              ? 'remote'
+              : 'local',
         remote,
         // Per-profile remote overrides: each profile may point at its own
         // backend (local spawn or its own remote URL). Preserved verbatim so
@@ -7064,7 +6703,7 @@ async function sanitizeDesktopConnectionConfig(config = readDesktopConnectionCon
   const remoteToken = decryptDesktopSecret(block.token)
   const authMode = normAuthMode(block.authMode)
   const remoteUrl = envOverride ? String(process.env.ARTEMIS_DESKTOP_REMOTE_URL || '') : String(block.url || '')
-  const mode = envOverride ? 'remote' : savedMode === 'ssh' ? 'ssh' : modeIsRemoteLike(savedMode) ? savedMode : 'local'
+  const mode = envOverride ? 'remote' : savedMode === 'ssh' ? 'ssh' : modeIsRemoteLike(savedMode) || savedMode === 'cloud' ? 'remote' : 'local'
 
   let remoteOauthConnected = false
 
@@ -7089,9 +6728,6 @@ async function sanitizeDesktopConnectionConfig(config = readDesktopConnectionCon
     remoteAuthMode: authMode,
     remoteOauthConnected,
     remoteUrl,
-    // The persisted Artemis Cloud org (slug/id) for a cloud connection, or '' for
-    // remote/local. Lets Settings → Gateway reopen into the same org.
-    cloudOrg: mode === 'cloud' ? String(block.org || '') : '',
     remoteTokenPreview: tokenPreview(remoteToken),
     remoteTokenSet: Boolean(remoteToken),
     sshHost: (ssh || savedSsh)?.host || '',
@@ -7109,57 +6745,34 @@ async function sanitizeDesktopConnectionConfig(config = readDesktopConnectionCon
 // Build + validate a `{ url, authMode, token }` remote block. OAuth gateways
 // authenticate via the login-window session cookie (verified at connect time in
 // resolveRemoteBackend), so only token-auth remotes require a saved token.
-// `org` (optional) is the Artemis Cloud org slug/id the instance was discovered
-// under — persisted so Settings can reopen into the same org; omitted from the
-// block when empty so plain remote connections stay unchanged.
-function buildRemoteBlock(remoteUrl, authMode, token, org?: string) {
+function buildRemoteBlock(remoteUrl, authMode, token) {
   if (authMode !== 'oauth' && !decryptDesktopSecret(token)) {
     throw new Error('Remote gateway session token is required.')
   }
 
-  const block: { url: string; authMode: string; token: object; org?: string } = {
+  return {
     url: normalizeRemoteBaseUrl(remoteUrl),
     authMode,
     token
   }
-
-  const orgValue = typeof org === 'string' ? org.trim() : ''
-
-  if (orgValue) {
-    block.org = orgValue
-  }
-
-  return block
 }
 
 function coerceDesktopConnectionConfig(input: any = {}, existing = readDesktopConnectionConfig(), options: any = {}) {
   const persistToken = options.persistToken !== false
   const key = connectionScopeKey(input.profile)
-  // 'cloud' and 'remote' both persist a remote-shaped block; 'cloud' is
-  // remembered as its own provenance (Q6) and resolves to remote downstream.
-  // Anything else collapses to local.
-  const mode = input.mode === 'ssh' ? 'ssh' : modeIsRemoteLike(input.mode) ? input.mode : 'local'
+  const normalizedInputMode = input.mode === 'cloud' ? 'remote' : input.mode
+  const mode = normalizedInputMode === 'ssh' ? 'ssh' : modeIsRemoteLike(normalizedInputMode) ? 'remote' : 'local'
   const remoteLike = modeIsRemoteLike(mode)
 
   // The block being edited: a per-profile entry or the global remote block.
   const rawExistingBlock = key ? existing.profiles?.[key] || {} : existing.remote || {}
-  // Leaving a CLOUD connection unselects it: a cloud block's url/org/token
-  // describe a discovered Artemis Cloud instance, NOT a user-owned remote gateway,
-  // so switching to local or remote must NOT inherit them (otherwise the stale
-  // cloud URL lingers and re-selecting Cloud looks "already connected"). When the
-  // saved block was cloud and the new mode is not cloud, start from an empty
-  // block. (remote↔local toggles still preserve a real remote URL as before.)
   const existingMode = key ? existing.profiles?.[key]?.mode : existing.mode
-  const leavingCloud = existingMode === 'cloud' && mode !== 'cloud'
+  const leavingLegacyCloud = existingMode === 'cloud' && mode !== 'remote'
   const leavingSsh = rawExistingBlock.mode === 'ssh' && mode !== 'ssh' && mode !== 'local'
-  const existingBlock = leavingCloud || leavingSsh ? {} : rawExistingBlock
+  const existingBlock = leavingLegacyCloud || leavingSsh ? {} : rawExistingBlock
   const remoteUrl = String(input.remoteUrl ?? existingBlock.url ?? '').trim()
   // authMode: explicit input wins; otherwise inherit the saved value, default 'token'.
   const authMode = resolveAuthMode(input.remoteAuthMode, existingBlock.authMode)
-  // Cloud org: only meaningful for 'cloud' mode. Explicit input wins; otherwise
-  // inherit the saved org. A plain 'remote' connection never carries an org
-  // (switching cloud→remote drops it), so it stays unset unless mode is cloud.
-  const cloudOrg = mode === 'cloud' ? String(input.cloudOrg ?? existingBlock.org ?? '').trim() : ''
   const incomingToken = typeof input.remoteToken === 'string' ? input.remoteToken.trim() : ''
 
   const nextToken = incomingToken
@@ -7185,13 +6798,12 @@ function coerceDesktopConnectionConfig(input: any = {}, existing = readDesktopCo
   }
 
   if (key) {
-    // Per-profile scope: a remote/cloud entry pins this profile to its own
-    // backend; a local entry clears the override so the profile inherits the
-    // default. The mode tag (remote vs cloud) is preserved on the entry.
+    // Per-profile scope: a remote entry pins this profile to its own backend; a
+    // local entry clears the override so the profile inherits the default.
     const profiles = { ...(existing.profiles || {}) }
 
     if (remoteLike) {
-      profiles[key] = { mode, ...buildRemoteBlock(remoteUrl, authMode, nextToken, cloudOrg) }
+      profiles[key] = { mode, ...buildRemoteBlock(remoteUrl, authMode, nextToken) }
     } else {
       const localEntry = localProfileEntry(rawExistingBlock)
 
@@ -7210,7 +6822,7 @@ function coerceDesktopConnectionConfig(input: any = {}, existing = readDesktopCo
   }
 
   const nextRemote = remoteLike
-    ? buildRemoteBlock(remoteUrl, authMode, nextToken, cloudOrg)
+    ? buildRemoteBlock(remoteUrl, authMode, nextToken)
     : existingMode === 'ssh'
       ? rawExistingBlock
       : { url: remoteUrl ? normalizeRemoteBaseUrl(remoteUrl) : remoteUrl, authMode, token: nextToken }
@@ -7644,14 +7256,7 @@ async function resolveRemoteBackend(profile) {
   if (override) {
     const token = override.authMode === 'oauth' ? null : decryptDesktopSecret(override.token)
 
-    return buildRemoteConnection(
-      override.url,
-      override.authMode,
-      token,
-      'profile',
-      undefined,
-      config.profiles?.[connectionScopeKey(profile)]?.mode === 'cloud' ? 'cloud' : 'url'
-    )
+    return buildRemoteConnection(override.url, override.authMode, token, 'profile')
   }
 
   // 2. Env override (global, token-auth only).
@@ -7683,21 +7288,14 @@ async function resolveRemoteBackend(profile) {
   }
 
   // Cloud resolves through the existing URL/OAuth path.
-  if (!modeIsRemoteLike(config.mode)) {
+  if (!modeIsRemoteLike(config.mode) && config.mode !== 'cloud') {
     return null
   }
 
   const authMode = normAuthMode(config.remote?.authMode)
   const token = authMode === 'oauth' ? null : decryptDesktopSecret(config.remote?.token)
 
-  return buildRemoteConnection(
-    config.remote?.url,
-    authMode,
-    token,
-    'settings',
-    undefined,
-    config.mode === 'cloud' ? 'cloud' : 'url'
-  )
+  return buildRemoteConnection(config.remote?.url, authMode, token, 'settings')
 }
 
 // A remote profile's sessions live on its remote host's state.db, not on a local
@@ -10563,34 +10161,6 @@ ipcMain.handle('artemis:connection-config:oauth-logout', async (_event, rawUrl) 
   return { ok: true, connected }
 })
 
-// --- Artemis Cloud (cloud-auto-discovery Phase 3) ---
-// One portal login in the OAuth partition powers both discovery and the silent
-// per-agent cascade. See the discovery/cascade helpers above.
-ipcMain.handle('artemis:cloud:status', async () => ({
-  portalBaseUrl: resolvePortalBaseUrl(),
-  signedIn: await hasLivePortalSession()
-}))
-ipcMain.handle('artemis:cloud:login', async () => {
-  await openPortalLoginWindow()
-
-  return { ok: true, signedIn: await hasLivePortalSession() }
-})
-ipcMain.handle('artemis:cloud:logout', async () => {
-  await clearOauthSession(resolvePortalBaseUrl())
-
-  return { ok: true, signedIn: await hasLivePortalSession() }
-})
-ipcMain.handle('artemis:cloud:discover', async (_event, org) => {
-  // Returns { agents } or { needsOrgSelection: true, orgs }. `org` (optional)
-  // scopes discovery to a chosen org for multi-org users.
-  return discoverCloudAgents(typeof org === 'string' && org ? org : undefined)
-})
-ipcMain.handle('artemis:cloud:agent-sign-in', async (_event, dashboardUrl) => {
-  // Silent per-agent sign-in via the shared portal session. Returns the agent's
-  // gateway baseUrl + whether its session cookie landed; the renderer then
-  // saves a cloud-mode connection pointed at this dashboardUrl.
-  return cloudAgentSilentSignIn(dashboardUrl)
-})
 ipcMain.handle('artemis:connection-config:save', async (_event, payload) => {
   const config = coerceDesktopConnectionConfig(payload)
   writeDesktopConnectionConfig(config)

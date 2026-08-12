@@ -21,7 +21,6 @@ import {
   buildGatewayWsUrlWithTicket,
   connectionScopeKey,
   cookiesHaveLiveSession,
-  cookiesHavePrivySession,
   cookiesHaveSession,
   gatewayTicketFailure,
   gatewayWsUrlIpcResult,
@@ -61,11 +60,8 @@ test('normAuthMode coerces to token unless explicitly oauth', () => {
 
 // --- modeIsRemoteLike ---
 
-test('modeIsRemoteLike is true for remote and cloud, false otherwise', () => {
-  // cloud resolves to a remote backend under the hood (Q6), so every resolution
-  // site treats it like remote.
+test('modeIsRemoteLike is true for remote, false otherwise', () => {
   assert.equal(modeIsRemoteLike('remote'), true)
-  assert.equal(modeIsRemoteLike('cloud'), true)
   assert.equal(modeIsRemoteLike('local'), false)
   assert.equal(modeIsRemoteLike(undefined), false)
   assert.equal(modeIsRemoteLike(null), false)
@@ -111,12 +107,10 @@ test('profileRemoteOverride preserves an explicit oauth auth mode', () => {
   assert.equal(profileRemoteOverride(config, 'coder').authMode, 'oauth')
 })
 
-test('profileRemoteOverride treats a cloud entry as a remote override', () => {
-  // A 'cloud' per-profile entry resolves to the same remote backend a 'remote'
-  // entry would (Q6) — the override must be returned, not dropped.
+test('profileRemoteOverride treats a remote entry as an override', () => {
   const config = {
     profiles: {
-      coder: { mode: 'cloud', url: 'https://agent-1.agents.nousresearch.com', authMode: 'oauth' }
+      coder: { mode: 'remote', url: 'https://agent-1.agents.nousresearch.com', authMode: 'oauth' }
     }
   }
 
@@ -197,14 +191,14 @@ test('normalizeSshConfig handles IPv6 and strict port bounds', () => {
   })
 })
 
-test('localProfileEntry preserves inactive SSH drafts but drops Cloud state', () => {
+test('localProfileEntry preserves inactive SSH drafts but drops remote state', () => {
   const ssh = { mode: 'ssh', host: 'box', user: 'alice', remoteArtemisPath: '/artemis' }
   assert.deepEqual(localProfileEntry(ssh), { mode: 'local', savedSsh: ssh })
   assert.deepEqual(localProfileEntry({ mode: 'local', savedSsh: ssh }), {
     mode: 'local',
     savedSsh: ssh
   })
-  assert.equal(localProfileEntry({ mode: 'cloud', url: 'https://agent' }), null)
+  assert.equal(localProfileEntry({ mode: 'remote', url: 'https://agent' }), null)
 })
 
 test('saved SSH drafts are inactive and explicit overrides take precedence', () => {
@@ -540,35 +534,6 @@ test('cookiesHaveLiveSession is false for unrelated cookies and non-arrays', () 
   assert.equal(cookiesHaveLiveSession(null), false)
   assert.equal(cookiesHaveLiveSession(undefined), false)
   assert.equal(cookiesHaveLiveSession([]), false)
-})
-
-// --- cookiesHavePrivySession (Nous portal / Privy auth, NOT gateway cookies) ---
-
-test('cookiesHavePrivySession detects the privy-token access cookie', () => {
-  assert.equal(cookiesHavePrivySession([{ name: 'privy-token', value: 'jwt' }]), true)
-})
-
-test('cookiesHavePrivySession detects __Host-/__Secure- prefixes and the legacy privy-session name', () => {
-  assert.equal(cookiesHavePrivySession([{ name: '__Host-privy-token', value: 'x' }]), true)
-  assert.equal(cookiesHavePrivySession([{ name: '__Secure-privy-token', value: 'x' }]), true)
-  assert.equal(cookiesHavePrivySession([{ name: 'privy-session', value: 'x' }]), true)
-})
-
-test('cookiesHavePrivySession is false for an empty value', () => {
-  assert.equal(cookiesHavePrivySession([{ name: 'privy-token', value: '' }]), false)
-})
-
-test('cookiesHavePrivySession does NOT treat artemis gateway cookies as a portal session', () => {
-  // The whole point of Q7: a gateway session cookie is NOT a portal sign-in.
-  assert.equal(cookiesHavePrivySession([{ name: 'artemis_session_at', value: 'x' }]), false)
-  assert.equal(cookiesHavePrivySession([{ name: '__Host-artemis_session_rt', value: 'x' }]), false)
-})
-
-test('cookiesHavePrivySession is false for unrelated cookies and non-arrays', () => {
-  assert.equal(cookiesHavePrivySession([{ name: 'other', value: 'x' }]), false)
-  assert.equal(cookiesHavePrivySession(null), false)
-  assert.equal(cookiesHavePrivySession(undefined), false)
-  assert.equal(cookiesHavePrivySession([]), false)
 })
 
 // --- tokenPreview ---

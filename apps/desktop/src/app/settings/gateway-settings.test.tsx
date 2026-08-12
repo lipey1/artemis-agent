@@ -14,7 +14,6 @@ vi.mock('@/store/profile', () => ({
 }))
 
 const localConnection = {
-  cloudOrg: '',
   envOverride: false,
   mode: 'local',
   remoteAuthMode: 'token',

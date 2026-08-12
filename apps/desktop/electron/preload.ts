@@ -127,15 +127,6 @@ contextBridge.exposeInMainWorld('artemisDesktop', {
   probeConnectionConfig: remoteUrl => ipcRenderer.invoke('artemis:connection-config:probe', remoteUrl),
   oauthLoginConnectionConfig: remoteUrl => ipcRenderer.invoke('artemis:connection-config:oauth-login', remoteUrl),
   oauthLogoutConnectionConfig: remoteUrl => ipcRenderer.invoke('artemis:connection-config:oauth-logout', remoteUrl),
-  // Artemis Cloud: one portal login powers discovery + silent per-agent sign-in
-  // (cloud-auto-discovery Phase 3).
-  cloud: {
-    status: () => ipcRenderer.invoke('artemis:cloud:status'),
-    login: () => ipcRenderer.invoke('artemis:cloud:login'),
-    logout: () => ipcRenderer.invoke('artemis:cloud:logout'),
-    discover: org => ipcRenderer.invoke('artemis:cloud:discover', org),
-    agentSignIn: dashboardUrl => ipcRenderer.invoke('artemis:cloud:agent-sign-in', dashboardUrl)
-  },
   profile: {
     get: () => ipcRenderer.invoke('artemis:profile:get'),
     set: name => ipcRenderer.invoke('artemis:profile:set', name)
