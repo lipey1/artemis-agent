@@ -118,6 +118,29 @@ function normalizeArtemisHomeRoot(artemisHome, { pathModule = pathModuleForPlatf
   return resolved
 }
 
+function artemisBackendSpawnEnv({
+  artemisHome,
+  sessionToken,
+  parentPid,
+  webDist,
+  readyFile
+}: {
+  artemisHome: string
+  sessionToken: string
+  parentPid: number | string
+  webDist?: string
+  readyFile?: string | null
+}) {
+  return {
+    ARTEMIS_HOME: artemisHome,
+    ARTEMIS_DASHBOARD_SESSION_TOKEN: sessionToken,
+    ARTEMIS_DESKTOP: '1',
+    ARTEMIS_PARENT_PID: String(parentPid),
+    ...(webDist ? { ARTEMIS_WEB_DIST: webDist } : {}),
+    ...(readyFile ? { ARTEMIS_DESKTOP_READY_FILE: readyFile } : {})
+  }
+}
+
 function buildDesktopBackendEnv({
   artemisHome,
   pythonPathEntries = [],
@@ -155,6 +178,7 @@ export {
   buildDesktopBackendPath,
   delimiterForPlatform,
   artemisManagedNodePathEntries,
+  artemisBackendSpawnEnv,
   normalizeArtemisHomeRoot,
   pathEnvKey,
   POSIX_SANE_PATH_ENTRIES

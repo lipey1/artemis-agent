@@ -23,6 +23,8 @@ interface SearchFieldProps {
   onClear?: () => void
   inputRef?: RefObject<HTMLInputElement | null>
   trailingAction?: ReactNode
+  /** When true (default), the empty field fades to 30% until focused. */
+  recede?: boolean
   'aria-label'?: string
 }
 
@@ -43,6 +45,7 @@ export function SearchField({
   onClear,
   inputRef,
   trailingAction,
+  recede = true,
   'aria-label': ariaLabel
 }: SearchFieldProps) {
   const { t } = useI18n()
@@ -61,12 +64,17 @@ export function SearchField({
         // container's flex min-width and the field bulldozes its siblings
         // instead of shrinking to fit its context.
         'inline-flex min-w-0 max-w-full items-center gap-1.5 border-b border-transparent px-0.5 transition-[color,border-color,opacity]',
-        // Recede until the user reaches for it.
-        !value && 'opacity-30 focus-within:opacity-100',
+        // Recede until the user reaches for it (opt out for always-visible fields like the sidebar).
+        !value && recede && 'opacity-30 focus-within:opacity-100',
         containerClassName
       )}
     >
-      <Search className="pointer-events-none size-3.5 shrink-0 text-muted-foreground/70" />
+      <Search
+        className={cn(
+          'pointer-events-none size-3.5 shrink-0',
+          recede ? 'text-muted-foreground/70' : 'text-(--ui-text-tertiary)'
+        )}
+      />
       <input
         aria-label={ariaLabel ?? placeholder}
         className={cn(
@@ -74,7 +82,8 @@ export function SearchField({
           // text; min-w-0 lets it shrink back below content size when the
           // context is narrower — long queries scroll inside the field.
           // text-xs matches the form controls (Input/Select via controlVariants).
-          'h-7 min-w-0 max-w-full bg-transparent text-xs text-foreground [field-sizing:content] placeholder:text-muted-foreground focus:outline-none',
+          'h-7 min-w-0 max-w-full bg-transparent text-xs text-foreground [field-sizing:content] focus:outline-none',
+          recede ? 'placeholder:text-muted-foreground' : 'placeholder:text-(--ui-text-tertiary)',
           inputClassName
         )}
         onChange={event => onChange(event.target.value)}

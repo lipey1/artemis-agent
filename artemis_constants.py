@@ -67,10 +67,9 @@ def _artemis_home_from_env() -> Path:
     installed by :func:`set_artemis_home_override`.  Shared by
     :func:`get_artemis_home` and :func:`get_process_artemis_home`.
     """
-    for key in ("ARTEMIS_HOME",):
-        val = os.environ.get(key, "").strip()
-        if val:
-            return Path(val)
+    val = os.environ.get("ARTEMIS_HOME", "").strip()
+    if val:
+        return Path(val)
     return _get_platform_default_artemis_home()
 
 

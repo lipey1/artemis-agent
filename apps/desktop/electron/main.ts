@@ -35,7 +35,7 @@ import { classifyActiveRuntime } from './active-runtime-state'
 import { stopBackendChild as stopBackendChildImpl, stopBackendTreesForUpdate } from './backend-child'
 import { dashboardFallbackArgs, sourceDeclaresServe } from './backend-command'
 import { createBackendConnectionState } from './backend-connection-state'
-import { buildDesktopBackendEnv, artemisManagedNodePathEntries, normalizeArtemisHomeRoot } from './backend-env'
+import { buildDesktopBackendEnv, artemisBackendSpawnEnv, artemisManagedNodePathEntries, normalizeArtemisHomeRoot } from './backend-env'
 import { isReauthRequiredError, waitForArtemisReady } from './backend-health'
 import {
   canImportArtemisCli,
@@ -8288,23 +8288,18 @@ async function spawnPoolBackend(profile, entry) {
       cwd: artemisCwd,
       env: {
         ...process.env,
-        ARTEMIS_HOME,
         ...backend.env,
+        ...artemisBackendSpawnEnv({
+          artemisHome: ARTEMIS_HOME,
+          sessionToken: token,
+          parentPid: process.pid,
+          webDist,
+          readyFile
+        }),
         // Pin the gateway's tool/terminal cwd to the same directory we chose for
         // the child process. Inherited TERMINAL_CWD (or a stale config bridge)
         // can still point at the install dir even when spawn cwd is home.
-        TERMINAL_CWD: artemisCwd,
-        ARTEMIS_DASHBOARD_SESSION_TOKEN: token,
-        // Marks this dashboard backend as desktop-spawned so it runs the cron
-        // scheduler tick loop (the gateway isn't running under the app).
-        ARTEMIS_DESKTOP: '1',
-        // Our PID so the backend's parent-death watchdog self-exits if we die
-        // uncleanly (crash / SIGKILL / update handoff) instead of leaking a
-        // serving backend + its MCP child subtree. See web_server.py
-        // _start_parent_death_watchdog.
-        ARTEMIS_PARENT_PID: String(process.pid),
-        ARTEMIS_WEB_DIST: webDist,
-        ...(readyFile ? { ARTEMIS_DESKTOP_READY_FILE: readyFile } : {})
+        TERMINAL_CWD: artemisCwd
       },
       shell: backend.shell,
       stdio: ['ignore', 'pipe', 'pipe']
@@ -8581,28 +8576,15 @@ async function startArtemis() {
         cwd: artemisCwd,
         env: {
           ...process.env,
-          // Explicitly pin ARTEMIS_HOME for the child so Python's get_artemis_home()
-          // resolves to the SAME location our resolveArtemisHome() picked. Without
-          // this pin, Python falls back to ~/.artemis on every platform — fine on
-          // mac/linux (where our default matches), but on Windows our default is
-          // %LOCALAPPDATA%\artemis, which differs from C:\Users\<u>\.artemis.
-          // Mismatch would split config / sessions / .env / logs across two
-          // directories. install.ps1 sets ARTEMIS_HOME via setx; the desktop
-          // can't reliably do that, so we set it inline for every spawn.
-          ARTEMIS_HOME,
           ...backend.env,
-          TERMINAL_CWD: artemisCwd,
-          ARTEMIS_DASHBOARD_SESSION_TOKEN: token,
-          // Marks this dashboard backend as desktop-spawned so it runs the cron
-          // scheduler tick loop (the gateway isn't running under the app).
-          ARTEMIS_DESKTOP: '1',
-          // Our PID so the backend's parent-death watchdog self-exits if we die
-          // uncleanly (crash / SIGKILL / update handoff) instead of leaking a
-          // serving backend + its MCP child subtree. See web_server.py
-          // _start_parent_death_watchdog.
-          ARTEMIS_PARENT_PID: String(process.pid),
-          ARTEMIS_WEB_DIST: webDist,
-          ...(readyFile ? { ARTEMIS_DESKTOP_READY_FILE: readyFile } : {})
+          ...artemisBackendSpawnEnv({
+            artemisHome: ARTEMIS_HOME,
+            sessionToken: token,
+            parentPid: process.pid,
+            webDist,
+            readyFile
+          }),
+          TERMINAL_CWD: artemisCwd
         },
         shell: backend.shell,
         stdio: ['ignore', 'pipe', 'pipe']

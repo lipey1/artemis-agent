@@ -8,6 +8,7 @@ import {
   buildDesktopBackendEnv,
   buildDesktopBackendPath,
   artemisManagedNodePathEntries,
+  artemisBackendSpawnEnv,
   normalizeArtemisHomeRoot,
   pathEnvKey,
   POSIX_SANE_PATH_ENTRIES
@@ -188,4 +189,21 @@ test('Windows PATH casing and delimiter are preserved without POSIX sane entries
 
 test('appendUniquePathEntries drops empty entries and keeps first occurrence', () => {
   assert.equal(appendUniquePathEntries([':/a::/b', ['/a', '/c']], { delimiter: ':' }), '/a:/b:/c')
+})
+
+test('artemisBackendSpawnEnv pins Artemis desktop spawn env vars', () => {
+  const env = artemisBackendSpawnEnv({
+    artemisHome: '/home/u/.artemis',
+    sessionToken: 'tok',
+    parentPid: 42,
+    webDist: '/dist',
+    readyFile: '/tmp/ready.json'
+  })
+
+  assert.equal(env.ARTEMIS_HOME, '/home/u/.artemis')
+  assert.equal(env.ARTEMIS_DASHBOARD_SESSION_TOKEN, 'tok')
+  assert.equal(env.ARTEMIS_DESKTOP, '1')
+  assert.equal(env.ARTEMIS_PARENT_PID, '42')
+  assert.equal(env.ARTEMIS_WEB_DIST, '/dist')
+  assert.equal(env.ARTEMIS_DESKTOP_READY_FILE, '/tmp/ready.json')
 })

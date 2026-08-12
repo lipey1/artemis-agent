@@ -20,14 +20,7 @@ Companion app: **[Artemis Mobile](https://github.com/lipey1/artemis-mobile)** (F
 
 Engine install tree: `/usr/local/lib/artemis-agent` (or `~/.artemis/artemis-agent`).
 
-This repository now contains the desktop UI (`apps/desktop`), shared types, and the Python agent (`artemis_cli` / `agent`). Build from the repo root with pnpm:
-
-```powershell
-pnpm install:desktop
-pnpm build
-```
-
-Or `cd apps/desktop` then `pnpm install` and `pnpm build`.
+This repository contains the desktop UI (`apps/desktop`), shared types, and the Python agent (`artemis_cli` / `agent`). See [Development](#development) and [`docs/BUILDING.md`](./docs/BUILDING.md) for the repo-root **pnpm** workflow.
 
 ---
 
@@ -190,34 +183,49 @@ contributors.
 ```text
 LICENSE
 README.md
+apps/desktop/          Electron + React UI (main desktop app)
+artemis_cli/           `artemis` CLI package
+agent/                 Python agent runtime
 brand/                 Logo and icons
-docs/                  Extra documentation
+docs/                  Build and project docs
 packaging/             .desktop templates
-scripts/               artemis CLI + install helpers
+scripts/               artemis CLI wrapper + install helpers
 release/               Checksums + pointer to GitHub Releases
                        (installer binaries are not stored in git)
 ```
 
 ---
 
-## Build from source
+## Development
 
-Requires Node.js **>= 22** and the Artemis agent desktop tree.
+Node.js **>= 22** and **pnpm** at the repo root. Full steps, env vars, and Electron compile commands are in [`docs/BUILDING.md`](./docs/BUILDING.md).
+
+Quick start:
 
 ```bash
-cd /path/to/artemis-agent/apps/desktop
-npm run build
-npx electron-builder --linux AppImage deb
-npx electron-builder --win portable nsis
-npx electron-builder --mac zip   # best on macOS; unsigned zip may work cross-build
+pnpm install:desktop   # first time: see BUILDING.md for approve-builds
+pnpm dev
+pnpm build
+pnpm start
 ```
 
-Publish artifacts via GitHub Releases. See [`docs/BUILDING.md`](./docs/BUILDING.md).
+Engine tree: `/usr/local/lib/artemis-agent` or bootstrap via Desktop first-run (`~/.artemis/artemis-agent`).
+
+## Build from source (installers)
+
+After `pnpm build` from the repo root:
+
+```bash
+pnpm dist
+# or platform-specific targets in apps/desktop via electron-builder (see docs/BUILDING.md)
+```
+
+Publish artifacts via GitHub Releases.
 
 Launch unpacked Linux build:
 
 ```bash
-cd release/linux-unpacked
+cd apps/desktop/release/linux-unpacked
 ARTEMIS_DESKTOP_APP_NAME=Artemis ./Artemis --no-sandbox --disable-gpu
 ```
 

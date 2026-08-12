@@ -1,8 +1,8 @@
 import fs from 'node:fs'
 
-// `artemis serve` announces ARTEMIS_BACKEND_READY; the legacy `artemis dashboard`
-// backend announces ARTEMIS_DASHBOARD_READY. Accept either so the desktop spawn
-// works against both the headless backend and old/dashboard runtimes.
+// `artemis serve` announces ARTEMIS_BACKEND_READY; `artemis dashboard`
+// announces ARTEMIS_DASHBOARD_READY. Accept either so the desktop spawn works
+// against both the headless backend and dashboard runtimes.
 const _READY_RE = /^ARTEMIS_(?:BACKEND|DASHBOARD)_READY port=(\d+)/m
 
 // The announcement clock starts the instant the backend process is spawned —
@@ -35,8 +35,8 @@ function resolvePortAnnounceTimeoutMs(env = process.env) {
 }
 
 /**
- * Watch a child process's stdout for the `ARTEMIS_(BACKEND|DASHBOARD)_READY
- * port=<N>` line that web_server.py prints after uvicorn binds its socket.
+ * Watch a child process's stdout for the `ARTEMIS_(BACKEND|DASHBOARD)_READY`
+ * port=<N> line that web_server.py prints after uvicorn binds its socket.
  *
  * Returns the parsed port. Rejects if:
  *   - the child exits before emitting the line
@@ -63,7 +63,8 @@ function waitForDashboardPort(child, timeoutMs = resolvePortAnnounceTimeoutMs())
 
       done = true
       clearTimeout(timer)
-      child.stdout.off('data', onData)
+      child.stdout?.off('data', onData)
+      child.stderr?.off('data', onData)
       child.off('exit', onExit)
       child.off('error', onError)
     }
@@ -101,7 +102,8 @@ function waitForDashboardPort(child, timeoutMs = resolvePortAnnounceTimeoutMs())
       reject(new Error(`Timed out waiting for Artemis backend port announcement (${timeoutMs}ms)`))
     }, timeoutMs)
 
-    child.stdout.on('data', onData)
+    child.stdout?.on('data', onData)
+    child.stderr?.on('data', onData)
     child.on('exit', onExit)
     child.on('error', onError)
   })

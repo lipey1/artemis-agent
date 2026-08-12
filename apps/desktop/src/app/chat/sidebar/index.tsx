@@ -1488,6 +1488,7 @@ export function ChatSidebar({
               inputRef={searchInputRef}
               onChange={setSearchQuery}
               placeholder={s.searchPlaceholder}
+              recede={false}
               value={searchQuery}
             />
           </div>
@@ -1530,7 +1531,7 @@ export function ChatSidebar({
                 dndSensors={dndSensors}
                 emptyState={<SidebarPinnedEmptyState />}
                 label={s.pinned}
-                labelIcon={<Codicon className="shrink-0" name="pin" size="0.75rem" />}
+                labelIcon={<Codicon className="shrink-0" name="pinned" size="0.75rem" />}
                 onArchiveSession={onArchiveSession}
                 onBranchSession={onBranchSession}
                 onDeleteSession={onDeleteSession}
