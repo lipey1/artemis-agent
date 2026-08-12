@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Artemis CLI — branded front-end.
+# artemis — Agent CLI on PATH (Windows-safe naming).
+#   artemis              → Agent CLI / TUI
+#   artemis desktop|gui  → Artemis Desktop (installed app when present)
 set -euo pipefail
 
 unset PYTHONPATH
@@ -22,9 +24,48 @@ fi
 
 ROOT="$(readlink -f "$LINK_ROOT" 2>/dev/null || echo "$LINK_ROOT")"
 PY="$ROOT/venv/bin/python"
-ENTRY="$ROOT/artemis"
+# Prefer the real console-script entry; never recurse into this wrapper.
+CLI_BIN="$ROOT/venv/bin/artemis-cli"
+if [[ ! -x "$CLI_BIN" ]]; then
+  CLI_BIN="$ROOT/venv/bin/artemis"
+fi
+ENTRY_PY="$ROOT/artemis"
 
-if [[ ! -x "$PY" || ! -f "$ENTRY" ]]; then
+resolve_desktop() {
+  if [[ -n "${ARTEMIS_DESKTOP_BIN:-}" && -x "${ARTEMIS_DESKTOP_BIN}" ]]; then
+    printf '%s\n' "$ARTEMIS_DESKTOP_BIN"
+    return 0
+  fi
+  for cand in /usr/bin/Artemis /opt/Artemis/Artemis /usr/local/bin/Artemis; do
+    if [[ -x "$cand" ]]; then
+      printf '%s\n' "$cand"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Fast path: plain `artemis desktop` / `artemis gui` → installed Desktop.
+if [[ "${1:-}" == "desktop" || "${1:-}" == "gui" ]]; then
+  shift
+  wants_dev=0
+  for a in "$@"; do
+    case "$a" in
+      --source|--build-only|--force-build|--fake-boot|--skip-build|--artemis-root|--artemis-root=*)
+        wants_dev=1
+        ;;
+    esac
+  done
+  if [[ "$wants_dev" -eq 0 ]]; then
+    if DESKTOP="$(resolve_desktop)"; then
+      exec "$DESKTOP" "$@"
+    fi
+  fi
+  # Fall through to Agent CLI (builds from source when needed).
+  set -- desktop "$@"
+fi
+
+if [[ ! -x "$PY" ]]; then
   echo "Artemis engine not found at $LINK_ROOT (-> $ROOT)" >&2
   exit 1
 fi
@@ -34,7 +75,8 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
 Artemis — AI assistant with tool-calling capabilities
 
 Usage:
-  artemis [options] [prompt]
+  artemis [options] [prompt]     Agent CLI / TUI
+  artemis desktop               Open Artemis Desktop (installed app)
   artemis chat | gateway | model | status | doctor | ...
 
 Engine link: $LINK_ROOT
@@ -51,4 +93,11 @@ if [[ "${1:-}" == "update" ]]; then
   exit 0
 fi
 
-exec "$PY" "$ENTRY" "$@"
+# Real CLI entry (Python module). Prefer console script if it is not this bash wrapper.
+if [[ -x "$CLI_BIN" ]] && ! head -1 "$CLI_BIN" | grep -q 'bash'; then
+  exec "$CLI_BIN" "$@"
+fi
+if [[ -f "$ENTRY_PY" ]]; then
+  exec "$PY" "$ENTRY_PY" "$@"
+fi
+exec "$PY" -m artemis_cli.main "$@"

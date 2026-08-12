@@ -15,11 +15,11 @@ def build_gui_parser(subparsers, *, cmd_gui: Callable) -> None:
     gui_parser = subparsers.add_parser(
         "desktop",
         aliases=["gui"],
-        help="Build and launch the native desktop app",
+        help="Open Artemis Desktop (installed app, or build from source)",
         description=(
-            "Launch the Artemis Electron desktop app. By default this installs "
-            "workspace Node dependencies, builds the current OS's unpacked "
-            "Electron app, then launches that packaged artifact."
+            "Open Artemis Desktop. With no flags, launches the installed app "
+            "(/usr/bin/Artemis, Program Files, or /Applications) when present. "
+            "Use --source / --force-build to build and launch from this repo."
         ),
     )
     gui_parser.add_argument(

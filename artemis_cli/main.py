@@ -5994,6 +5994,46 @@ def _write_desktop_build_stamp(project_root: Path, *, source_mode: bool) -> None
         logger.debug("Failed to write desktop build stamp: %s", exc)
 
 
+def _system_desktop_executable() -> Optional[Path]:
+    """Return an installed Artemis Desktop binary when present.
+
+    Prefers the OS package install so ``artemis desktop`` opens the shipped
+    app without rebuilding from source. Dev flags (--source, --force-build,
+    --build-only) skip this path.
+    """
+    env_override = os.environ.get("ARTEMIS_DESKTOP_BIN", "").strip()
+    if env_override:
+        p = Path(env_override).expanduser()
+        if p.is_file() and os.access(p, os.X_OK):
+            return p
+
+    candidates: list[Path] = []
+    if sys.platform == "darwin":
+        candidates = [
+            Path("/Applications/Artemis.app/Contents/MacOS/Artemis"),
+            Path.home() / "Applications" / "Artemis.app" / "Contents" / "MacOS" / "Artemis",
+        ]
+    elif sys.platform == "win32":
+        local = os.environ.get("LOCALAPPDATA", "")
+        prog = os.environ.get("PROGRAMFILES", r"C:\Program Files")
+        candidates = [
+            Path(prog) / "Artemis" / "Artemis.exe",
+            Path(local) / "Programs" / "Artemis" / "Artemis.exe" if local else Path(),
+            Path(local) / "Artemis" / "Artemis.exe" if local else Path(),
+        ]
+    else:
+        candidates = [
+            Path("/usr/bin/Artemis"),
+            Path("/opt/Artemis/Artemis"),
+            Path("/usr/local/bin/Artemis"),
+        ]
+
+    for p in candidates:
+        if p and p.is_file() and os.access(p, os.X_OK):
+            return p
+    return None
+
+
 def _desktop_packaged_executable(desktop_dir: Path) -> Optional[Path]:
     """Return the current platform's unpacked Electron app executable."""
     release_dir = desktop_dir / "release"
@@ -7061,6 +7101,45 @@ def _register_linux_desktop_entry() -> None:
 
 def cmd_gui(args: argparse.Namespace):
     """Build and launch the native Electron desktop GUI."""
+    source_mode = getattr(args, "source", False)
+    skip_build = getattr(args, "skip_build", False)
+    force_build = getattr(args, "force_build", False)
+    build_only = getattr(args, "build_only", False)
+    wants_dev_build = (
+        source_mode
+        or force_build
+        or build_only
+        or getattr(args, "fake_boot", False)
+        or bool(getattr(args, "artemis_root", None))
+    )
+
+    # Plain ``artemis desktop``: open the installed app when available
+    # (Windows-safe naming: one lowercase command + subcommand).
+    if not wants_dev_build and not skip_build:
+        system_exe = _system_desktop_executable()
+        if system_exe is not None:
+            env = os.environ.copy()
+            if getattr(args, "ignore_existing", False):
+                env["ARTEMIS_DESKTOP_IGNORE_EXISTING"] = "1"
+            if getattr(args, "cwd", None):
+                env["ARTEMIS_DESKTOP_CWD"] = str(Path(args.cwd).expanduser().resolve())
+            else:
+                env["ARTEMIS_DESKTOP_CWD"] = os.getcwd()
+            config_electron_flags, config_disable_gpu = _desktop_launch_options()
+            if config_disable_gpu != "auto" and "ARTEMIS_DESKTOP_DISABLE_GPU" not in os.environ:
+                env["ARTEMIS_DESKTOP_DISABLE_GPU"] = config_disable_gpu
+            print(f"→ Launching installed Artemis Desktop: {system_exe}")
+            try:
+                subprocess.Popen(
+                    [str(system_exe), *config_electron_flags],
+                    env=env,
+                    start_new_session=True,
+                )
+            except OSError as exc:
+                print(f"✗ Failed to launch Desktop: {exc}")
+                sys.exit(1)
+            return
+
     desktop_dir = PROJECT_ROOT / "apps" / "desktop"
     if not (desktop_dir / "package.json").exists():
         print(f"Desktop GUI source not found at: {desktop_dir}")
@@ -7094,10 +7173,6 @@ def cmd_gui(args: argparse.Namespace):
     config_electron_flags, config_disable_gpu = _desktop_launch_options()
     if config_disable_gpu != "auto" and "ARTEMIS_DESKTOP_DISABLE_GPU" not in os.environ:
         env["ARTEMIS_DESKTOP_DISABLE_GPU"] = config_disable_gpu
-
-    source_mode = getattr(args, "source", False)
-    skip_build = getattr(args, "skip_build", False)
-    force_build = getattr(args, "force_build", False)
 
     packaged_executable = _desktop_packaged_executable(desktop_dir)
 

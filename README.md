@@ -84,7 +84,14 @@ Expand-Archive Artemis-*-win-x64-portable.zip -DestinationPath .\Artemis
 ## CLI: talk to Artemis in the terminal
 
 Requires a local Artemis engine install (Desktop bundle or
-`/usr/local/lib/artemis-agent`).
+`/usr/local/lib/artemis-agent` / `~/.artemis/artemis-agent`).
+
+Windows-safe naming (one lowercase command):
+
+| Command | Opens |
+|---------|--------|
+| `artemis` | Agent CLI / TUI (cyan Artemis banner) |
+| `artemis desktop` | Artemis Desktop app (installed `.deb` / AppImage when present) |
 
 ```bash
 # Install wrapper (once)
@@ -96,10 +103,12 @@ export ARTEMIS_HOME="$HOME/.artemis"
 
 artemis -z "Quem é você?"
 artemis chat
+artemis desktop
 artemis status
 ```
 
 The CLI uses `~/.artemis` and your `SOUL.md` so the model answers as **Artemis**.
+Do not rely on `Artemis` vs `artemis` case differences (broken on Windows).
 
 Updates check **[lipey1/artemis-desktop releases](https://github.com/lipey1/artemis-desktop/releases/latest)**.
 After branding an engine checkout, run:
