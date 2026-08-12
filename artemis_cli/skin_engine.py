@@ -1030,6 +1030,8 @@ def get_prompt_toolkit_style_overrides() -> Dict[str, str]:
         "status-bar-warn": f"bg:{status_bg} {status_warn} bold",
         "status-bar-bad": f"bg:{status_bg} {status_bad} bold",
         "status-bar-critical": f"bg:{status_bg} {status_critical} bold",
+        # Session-title chip: skin accent (not hardcoded Hermes gold).
+        "status-bar-session-title": f"bg:{status_strong} {status_bg} bold",
         "input-rule": input_rule,
         "image-badge": f"{label} bold",
         "completion-menu": f"bg:{menu_bg} {text}",

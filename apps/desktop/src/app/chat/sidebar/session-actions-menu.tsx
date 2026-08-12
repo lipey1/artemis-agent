@@ -98,6 +98,8 @@ interface SessionActions {
   onPin?: () => void
   onBranch?: () => void
   onArchive?: () => void
+  /** When true, the archive action becomes Unarchive (archived sidebar view). */
+  archived?: boolean
   onDelete?: () => void
   /** Close this surface (a tile tab) — omitted where nothing closes (sidebar
    *  rows, the main tab). */
@@ -180,6 +182,7 @@ function useSessionActions({
   onPin,
   onBranch,
   onArchive,
+  archived = false,
   onDelete,
   onClose,
   onHideTabBar,
@@ -188,6 +191,7 @@ function useSessionActions({
 }: SessionActions) {
   const { t } = useI18n()
   const r = t.sidebar.row
+  const sessionsCopy = t.settings.sessions
   const [renameOpen, setRenameOpen] = useState(false)
   const tiles = useStore($sessionTiles)
   const selectedStoredSessionId = useStore($selectedStoredSessionId)
@@ -344,12 +348,12 @@ function useSessionActions({
         ]
       : []
 
-  // DANGER — put it away / destroy it (delete stays last, destructive-red).
+  // DANGER — put it away / restore it / destroy it (delete stays last, destructive-red).
   const dangerItems: ActionItemSpec[] = [
     spec({
       disabled: !onArchive,
-      icon: 'archive',
-      label: r.archive,
+      icon: archived ? 'unarchive' : 'archive',
+      label: archived ? sessionsCopy.unarchive : r.archive,
       onSelect: () => {
         triggerHaptic('selection')
         onArchive?.()

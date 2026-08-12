@@ -48,6 +48,11 @@ vi.mock('@/i18n', () => ({
           untitledPlaceholder: 'Untitled'
         }
       },
+      settings: {
+        sessions: {
+          unarchive: 'Unarchive'
+        }
+      },
       zones: { closeAll: 'Close all', closeOthers: 'Close others', closeToRight: 'Close to the right' }
     }
   })
@@ -112,5 +117,30 @@ describe('SessionActionsMenu', () => {
     expect(await screen.findByRole('menu')).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: /rename/i })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: /archive/i })).toBeTruthy()
+  })
+
+  it('shows Unarchive when the session is archived', async () => {
+    render(
+      <SessionActionsMenu
+        archived
+        onArchive={vi.fn()}
+        onDelete={vi.fn()}
+        onPin={vi.fn()}
+        sessionId="sess-archived"
+        title="Archived chat"
+      >
+        <button type="button">Session actions</button>
+      </SessionActionsMenu>
+    )
+
+    const trigger = screen.getByRole('button', { name: 'Session actions' })
+
+    fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' })
+    fireEvent.pointerUp(trigger, { button: 0, pointerType: 'mouse' })
+    fireEvent.click(trigger)
+
+    expect(await screen.findByRole('menu')).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: /unarchive/i })).toBeTruthy()
+    expect(screen.queryByRole('menuitem', { name: /^archive$/i })).toBeNull()
   })
 })

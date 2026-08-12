@@ -21,6 +21,7 @@ import {
   tombstoneSessions,
   untombstoneSessions
 } from '@/store/projects'
+import { $archivedSessions } from '@/store/sidebar-archive'
 import {
   $activeSessionStoredIdRotation,
   $currentCwd,
@@ -1512,8 +1513,45 @@ export function useSessionActions({
     [copy, runtimeIdByStoredSessionIdRef, selectedStoredSessionId, sessionStateByRuntimeIdRef, startFreshSessionDraft]
   )
 
+  const unarchiveSession = useCallback(
+    async (storedSessionId: string) => {
+      clearNotifications()
+
+      const fromArchived = $archivedSessions.get().find(session => sessionMatchesStoredId(session, storedSessionId))
+      const fromLive = $sessions.get().find(session => sessionMatchesStoredId(session, storedSessionId))
+      const session = fromArchived ?? fromLive
+      const ids = [storedSessionId, session?.id, session?._lineage_root_id].filter(Boolean) as string[]
+
+      beginSessionMutation(ids)
+      // Optimistic: leave the archived view immediately.
+      $archivedSessions.set($archivedSessions.get().filter(s => !sessionMatchesStoredId(s, storedSessionId)))
+      untombstoneSessions(ids)
+
+      if (session) {
+        setSessions(prev => [{ ...session, archived: false }, ...prev.filter(s => !sessionMatchesStoredId(s, storedSessionId))])
+      }
+
+      try {
+        await setSessionArchived(storedSessionId, false, session?.profile)
+        notify({ durationMs: 2_000, kind: 'success', message: t.settings.sessions.restored })
+      } catch (err) {
+        if (session) {
+          $archivedSessions.set([{ ...session, archived: true }, ...$archivedSessions.get()])
+          setSessions(prev => prev.filter(s => !sessionMatchesStoredId(s, storedSessionId)))
+          tombstoneSessions(ids)
+        }
+
+        notifyError(err, t.settings.sessions.unarchiveFailed)
+      } finally {
+        endSessionMutation(ids)
+      }
+    },
+    [t]
+  )
+
   return {
     archiveSession,
+    unarchiveSession,
     branchCurrentSession,
     branchStoredSession,
     closeSettings,

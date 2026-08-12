@@ -21,8 +21,7 @@ export async function loadArchivedSessions(): Promise<void> {
   try {
     const result = await listAllProfileSessions(ARCHIVED_FETCH_LIMIT, 0, 'only')
 
-    $archivedSessions.set(result.sessions)
-  } catch {
+    $archivedSessions.set(result.sessions.map(session => ({ ...session, archived: true })))  } catch {
     $archivedSessions.set([])
   } finally {
     $archivedSessionsLoading.set(false)

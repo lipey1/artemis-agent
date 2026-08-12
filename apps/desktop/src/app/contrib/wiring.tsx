@@ -47,6 +47,7 @@ import {
   refreshActiveProfile
 } from '@/store/profile'
 import { $startWorkSessionRequest, followActiveSessionCwd } from '@/store/projects'
+import { $archivedSessions } from '@/store/sidebar-archive'
 import {
   $activeSessionId,
   $connection,
@@ -437,6 +438,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
 
   const {
     archiveSession,
+    unarchiveSession,
     branchCurrentSession,
     branchStoredSession,
     createBackendSessionForSend,
@@ -861,7 +863,13 @@ export function ContribWiring({ children }: { children: ReactNode }) {
   const nextActions: WiringActions = {
     onAddContextRef: composer.addContextRefAttachment,
     onAddUrl: url => composer.addContextRefAttachment(`@url:${formatRefValue(url)}`, url),
-    onArchiveSession: sessionId => void archiveSession(sessionId),
+    onArchiveSession: sessionId => {
+      const isArchived =
+        $archivedSessions.get().some(session => sessionMatchesStoredId(session, sessionId)) ||
+        Boolean($sessions.get().find(session => sessionMatchesStoredId(session, sessionId))?.archived)
+
+      void (isArchived ? unarchiveSession(sessionId) : archiveSession(sessionId))
+    },
     onAttachDroppedItems: composer.attachDroppedItems,
     onAttachImageBlob: composer.attachImageBlob,
     onBranchInNewChat: messageId => void branchInNewChat(messageId),
