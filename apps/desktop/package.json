@@ -1,6 +1,7 @@
 {
   "name": "artemis",
   "productName": "Artemis",
+  "desktopName": "Artemis",
   "private": true,
   "version": "0.17.13",
   "description": "Artemis Desktop - native shell for the Artemis agent.",
