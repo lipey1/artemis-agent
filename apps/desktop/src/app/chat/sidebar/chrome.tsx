@@ -81,7 +81,7 @@ export function SidebarRowShell({
     <div className={cn(rowMinH, 'grid grid-cols-[minmax(0,1fr)_auto] items-stretch rounded-md', className)} {...props}>
       {children}
       {actions ? (
-        <div className="flex shrink-0 items-center self-center" data-row-actions>
+        <div className="flex shrink-0 items-center self-center pr-2" data-row-actions>
           {actions}
         </div>
       ) : null}

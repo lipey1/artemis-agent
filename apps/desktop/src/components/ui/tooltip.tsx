@@ -96,28 +96,22 @@ function TooltipContent({
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content
-        // Transparent, width-capped wrapper. The visible chip is the inner inline
-        // span so `box-decoration-break: clone` gives a marker-style background
-        // that hugs EACH wrapped line (bg only on the text, ragged right — no
-        // rectangular dead space). No fade transition — once the hover delay
-        // elapses the chip appears at once.
-        // pointer-events-none: the tip must never steal hover/clicks from the
-        // chrome underneath (titlebar tools, adjacent tabs, etc.).
-        className={cn('pointer-events-none z-(--z-over-modal) w-fit max-w-64 select-none', className)}
+        // Match dropdown/popover chrome: elevated surface, soft border, blur.
+        // Solid rounded chip (the old marker-style box-decoration-clone looked
+        // like a plain inverted rectangle and fought the rest of the UI).
+        // pointer-events-none: never steal hover/clicks from chrome underneath.
+        className={cn(
+          'pointer-events-none z-(--z-over-modal) w-fit max-w-72 select-none rounded-lg border border-(--ui-stroke-secondary) bg-[color-mix(in_srgb,var(--ui-bg-elevated)_94%,transparent)] px-2.5 py-1.5 text-[11px] font-medium leading-snug text-(--ui-text-primary) shadow-md backdrop-blur-md',
+          className
+        )}
         data-slot="tooltip-content"
         sideOffset={sideOffset}
         {...props}
       >
-        {/* bg-foreground/text-background auto-inverts per theme. leading-normal
-            keeps lines readable; py-1 makes the cloned line-boxes overlap just
-            enough to read as one continuous fill (no gaps between lines). */}
         {/* [&>*]:!inline-flex: a block-level label child (e.g. `flex`) collapses
-            this inline decoration's geometry, so Radix measures a zero-size chip
-            and parks an empty rectangle in the corner (#62022). Force any direct
-            child inline-flex so every call site stays safe. */}
-        <span className="box-decoration-clone inline bg-foreground px-1.5 py-1 text-[11px] font-bold leading-normal text-background [font-family:Arial,sans-serif] [&>*]:!inline-flex">
-          {children}
-        </span>
+            measurement so Radix parks an empty chip (#62022). Keep children
+            inline-flex so every call site stays safe. */}
+        <span className="[&>*]:!inline-flex">{children}</span>
       </TooltipPrimitive.Content>
     </TooltipPrimitive.Portal>
   )
@@ -187,9 +181,8 @@ interface TipHintLabelProps {
   hint?: string
 }
 
-/** Tooltip label with an optional trailing hotkey hint. Uses `inline-flex` so it
- *  stays safe inside Tip's decoration wrapper — prefer this over a bespoke
- *  flex/gap span at the call site (see #62022). */
+/** Tooltip label with an optional trailing hotkey hint. Keep this as an
+ *  `inline-flex` row so keybind hints stay on one line inside Tip. */
 function TipHintLabel({ text, hint }: TipHintLabelProps) {
   if (!hint) {
     return <>{text}</>
