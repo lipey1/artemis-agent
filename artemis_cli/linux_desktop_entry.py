@@ -102,6 +102,41 @@ def render_desktop_entry(exec_command: str, icon: str) -> str:
     )
 
 
+def clear_stale_user_icon_cache() -> bool:
+    """Remove a ghost Artemis entry from the per-user hicolor icon cache.
+
+    Gtk prefers ``~/.local/share/icons/hicolor`` over ``/usr/share``. When
+    ``icon-theme.cache`` still lists ``Artemis`` but the PNG files are gone,
+    ``Icon=Artemis`` resolves to a missing path and GNOME shows a blank dock
+    glyph. Deleting that stale cache lets lookup fall through to the system
+    icons. Return True when a cache file was removed.
+    """
+    if not is_supported():
+        return False
+
+    hicolor = _xdg_data_home() / "icons" / "hicolor"
+    cache = hicolor / "icon-theme.cache"
+    if not cache.is_file():
+        return False
+
+    try:
+        raw = cache.read_bytes()
+    except OSError:
+        return False
+    if b"Artemis" not in raw:
+        return False
+
+    has_png = any(hicolor.glob("**/Artemis.png")) or any(hicolor.glob("**/artemis.png"))
+    if has_png:
+        return False
+
+    try:
+        cache.unlink()
+    except OSError:
+        return False
+    return True
+
+
 def refresh_desktop_databases(applications_dir: Path) -> "list[str]":
     """Reindex the menu caches. Run each tool only when it exists.
 
@@ -149,11 +184,23 @@ def install_desktop_entry(project_root: Path) -> Optional[Path]:
     if not is_supported():
         return None
 
+    # Drop ghost user icon caches before writing the launcher so GNOME does
+    # not keep resolving Icon=Artemis to a deleted ~/.local PNG path.
+    clear_stale_user_icon_cache()
+
     entry_path = desktop_entry_path()
     icon = icon_path(project_root)
-    # Use the themed name when the checkout has no icon (a lite or
-    # packaged install). A broken absolute path renders as no icon.
-    icon_value = str(icon) if icon.is_file() else "Artemis"
+    # Prefer an absolute path. Themed names (Icon=Artemis) lose to a stale
+    # per-user hicolor cache that lists Artemis with no file on disk.
+    # Packaged installs without a checkout icon fall back to the system
+    # hicolor PNG when present, else the themed name.
+    system_icon = Path("/usr/share/icons/hicolor/256x256/apps/Artemis.png")
+    if icon.is_file():
+        icon_value = str(icon)
+    elif system_icon.is_file():
+        icon_value = str(system_icon)
+    else:
+        icon_value = "Artemis"
     contents = render_desktop_entry(resolve_exec_command(), icon_value)
 
     try:

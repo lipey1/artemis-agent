@@ -4,7 +4,7 @@ Name=Artemis
 GenericName=Artemis Desktop
 Comment=Artemis Desktop agent
 Exec=env ARTEMIS_DESKTOP_APP_NAME=Artemis Artemis --no-sandbox --disable-gpu
-Icon=Artemis
+Icon=/usr/share/icons/hicolor/256x256/apps/Artemis.png
 Terminal=false
 Categories=Utility;Development;
 StartupNotify=true

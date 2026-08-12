@@ -3,7 +3,7 @@
   "productName": "Artemis",
   "desktopName": "Artemis",
   "private": true,
-  "version": "0.17.13",
+  "version": "0.17.14",
   "description": "Artemis Desktop - native shell for the Artemis agent.",
   "author": "Artemis / lipey1",
   "type": "module",
@@ -271,6 +271,9 @@
         "deb",
         "rpm"
       ]
+    },
+    "deb": {
+      "afterInstall": "../../packaging/linux/after-install.sh"
     },
     "nsis": {
       "oneClick": false,
