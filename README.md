@@ -20,6 +20,15 @@ Companion app: **[Artemis Mobile](https://github.com/lipey1/artemis-mobile)** (F
 
 Engine install tree: `/usr/local/lib/artemis-agent` (or `~/.artemis/artemis-agent`).
 
+This repository now contains the desktop UI (`apps/desktop`), shared types, and the Python agent (`artemis_cli` / `agent`). Build from the repo root with pnpm:
+
+```powershell
+pnpm install:desktop
+pnpm build
+```
+
+Or `cd apps/desktop` then `pnpm install` and `pnpm build`.
+
 ---
 
 ## Install (Linux / macOS / Windows)

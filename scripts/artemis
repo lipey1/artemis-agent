@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Artemis CLI — branded front-end.
+set -euo pipefail
+
+unset PYTHONPATH
+unset PYTHONHOME
+
+export ARTEMIS_HOME="${ARTEMIS_HOME:-$HOME/.artemis}"
+export ARTEMIS_DESKTOP_APP_NAME="${ARTEMIS_DESKTOP_APP_NAME:-Artemis}"
+
+if [[ -n "${ARTEMIS_ROOT:-}" ]]; then
+  LINK_ROOT="$ARTEMIS_ROOT"
+elif [[ -e /usr/local/lib/artemis-agent ]]; then
+  LINK_ROOT=/usr/local/lib/artemis-agent
+elif [[ -e "$HOME/.local/lib/artemis-agent" ]]; then
+  LINK_ROOT="$HOME/.local/lib/artemis-agent"
+elif [[ -e "$ARTEMIS_HOME/artemis-agent" ]]; then
+  LINK_ROOT="$ARTEMIS_HOME/artemis-agent"
+else
+  LINK_ROOT="$ARTEMIS_HOME/artemis-agent"
+fi
+
+ROOT="$(readlink -f "$LINK_ROOT" 2>/dev/null || echo "$LINK_ROOT")"
+PY="$ROOT/venv/bin/python"
+ENTRY="$ROOT/artemis"
+
+if [[ ! -x "$PY" || ! -f "$ENTRY" ]]; then
+  echo "Artemis engine not found at $LINK_ROOT (-> $ROOT)" >&2
+  exit 1
+fi
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  cat <<HELP
+Artemis — AI assistant with tool-calling capabilities
+
+Usage:
+  artemis [options] [prompt]
+  artemis chat | gateway | model | status | doctor | ...
+
+Engine link: $LINK_ROOT
+Data:        \$HOME/.artemis
+HELP
+fi
+
+export ARTEMIS_ENGINE_ROOT="$LINK_ROOT"
+
+if [[ "${1:-}" == "update" ]]; then
+  echo "Artemis updates come from GitHub Releases."
+  echo "  https://github.com/lipey1/artemis-desktop/releases/latest"
+  echo "Download the asset for your OS and install it over the current build."
+  exit 0
+fi
+
+exec "$PY" "$ENTRY" "$@"

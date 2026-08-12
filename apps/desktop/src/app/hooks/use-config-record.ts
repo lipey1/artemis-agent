@@ -1,0 +1,22 @@
+import { useQuery } from '@tanstack/react-query'
+
+import { getArtemisConfigRecord } from '@/artemis'
+import { queryClient, writeCache } from '@/lib/query-client'
+import type { ArtemisConfigRecord } from '@/types/artemis'
+
+// One shared cache for the whole profile config record (`GET /api/config`).
+// Every settings surface (MCP, model, config) reads and writes through this key
+// so a save in one shows in the others, and revisiting a tab paints the cache
+// instead of blanking on a fresh fetch.
+//
+// Distinct from session/hooks/use-artemis-config.ts, which is side-effecting —
+// it pushes personality/cwd/voice/… into the session stores for live chat.
+export const ARTEMIS_CONFIG_KEY = ['artemis-config-record'] as const
+
+// staleTime 0 → serve cache instantly, background-revalidate on every mount.
+export const useArtemisConfigRecord = () =>
+  useQuery({ queryKey: ARTEMIS_CONFIG_KEY, queryFn: getArtemisConfigRecord, staleTime: 0 })
+
+export const setArtemisConfigCache = writeCache<ArtemisConfigRecord>(ARTEMIS_CONFIG_KEY)
+
+export const invalidateArtemisConfig = () => queryClient.invalidateQueries({ queryKey: ARTEMIS_CONFIG_KEY })

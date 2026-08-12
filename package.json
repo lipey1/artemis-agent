@@ -1,0 +1,21 @@
+{
+  "name": "artemis",
+  "productName": "Artemis",
+  "private": true,
+  "version": "0.17.1",
+  "description": "Artemis Desktop. UI source is in apps/desktop.",
+  "author": "Artemis / lipey1",
+  "license": "MIT",
+  "homepage": "https://github.com/lipey1/artemis-desktop",
+  "packageManager": "pnpm@11.21.0",
+  "scripts": {
+    "dev": "node scripts/run-desktop.mjs dev",
+    "build": "node scripts/run-desktop.mjs build",
+    "start": "node scripts/run-desktop.mjs start",
+    "pack": "node scripts/run-desktop.mjs pack",
+    "dist": "node scripts/run-desktop.mjs dist",
+    "dist:win": "node scripts/run-desktop.mjs dist:win",
+    "preview": "node scripts/run-desktop.mjs preview",
+    "install:desktop": "pnpm --dir apps/desktop install"
+  }
+}
