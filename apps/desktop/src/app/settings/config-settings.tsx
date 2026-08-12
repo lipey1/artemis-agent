@@ -1,6 +1,5 @@
 import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
-import type { ChangeEvent } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 
@@ -19,7 +18,7 @@ import {
   setDataUrlReadMaxMb
 } from '@/store/data-url-read-max'
 import { $keepAwake, setKeepAwake } from '@/store/keep-awake'
-import { notify, notifyError } from '@/store/notifications'
+import { notifyError } from '@/store/notifications'
 import { repoDiscoveryPolicyFromConfig, repoDiscoveryPolicySignature, scanAndRecordRepos } from '@/store/projects'
 import type { ConfigFieldSchema, ArtemisConfigRecord } from '@/types/artemis'
 
@@ -58,13 +57,11 @@ export function voiceFieldVisible(key: string, config: ArtemisConfigRecord): boo
 export function ConfigSettings({
   activeSectionId,
   onConfigSaved,
-  onMainModelChanged,
-  importInputRef
+  onMainModelChanged
 }: {
   activeSectionId: string
   onConfigSaved?: () => void
   onMainModelChanged?: (provider: string, model: string) => void
-  importInputRef: React.RefObject<HTMLInputElement | null>
 }) {
   const { t } = useI18n()
   const c = t.settings.config
@@ -232,28 +229,6 @@ export function ConfigSettings({
     return () => window.clearTimeout(timeout)
   }, [config, schema, setSearchParams, targetField])
 
-  function handleImport(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-
-    if (!file) {
-      return
-    }
-
-    const reader = new FileReader()
-
-    reader.onload = () => {
-      try {
-        updateConfig(JSON.parse(String(reader.result)))
-        notify({ kind: 'success', title: c.imported, message: t.common.saving })
-      } catch (err) {
-        notifyError(err, c.invalidJson)
-      }
-    }
-
-    reader.readAsText(file)
-    e.target.value = ''
-  }
-
   if (!config || !schema) {
     // A failed config/schema fetch must surface a retry, not spin forever.
     if ((configLoadFailed && !config) || (schemaFailed && !schema)) {
@@ -350,13 +325,6 @@ export function ConfigSettings({
           ))}
         </div>
       )}
-      <input
-        accept=".json,application/json"
-        className="hidden"
-        onChange={handleImport}
-        ref={importInputRef}
-        type="file"
-      />
     </SettingsContent>
   )
 }

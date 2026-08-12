@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, type ChangeEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
 import { codiconIcon } from '@/components/ui/codicon'
@@ -22,7 +22,9 @@ import {
   Wrench,
   Zap
 } from '@/lib/icons'
-import { notifyError } from '@/store/notifications'
+import { notify, notifyError } from '@/store/notifications'
+
+import { setArtemisConfigCache } from '../hooks/use-config-record'
 
 import { useRouteEnumParam } from '../hooks/use-route-enum-param'
 import { OverlayIconButton } from '../overlays/overlay-chrome'
@@ -125,6 +127,36 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
     } catch (err) {
       notifyError(err, t.settings.exportFailed)
     }
+  }
+
+  // File input lives here (not inside ConfigSettings) so Import works from any
+  // settings tab — About, Gateway, etc. Previously the hidden <input> only
+  // mounted on config:* views, so the footer Upload button was a no-op.
+  const handleImportConfig = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      void (async () => {
+        try {
+          const parsed = JSON.parse(String(reader.result)) as Record<string, unknown>
+          await saveArtemisConfig(parsed)
+          setArtemisConfigCache(parsed)
+          triggerHaptic('success')
+          notify({
+            kind: 'success',
+            title: t.settings.config.imported,
+            message: t.common.saving
+          })
+          onConfigSaved?.()
+        } catch (err) {
+          notifyError(err, t.settings.config.invalidJson)
+        }
+      })()
+    }
+    reader.readAsText(file)
+    e.target.value = ''
   }
 
   const resetConfig = async () => {
@@ -295,6 +327,13 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
 
   return (
     <OverlayView closeLabel={t.settings.closeSettings} onClose={onClose}>
+      <input
+        accept=".json,application/json"
+        className="hidden"
+        onChange={handleImportConfig}
+        ref={importInputRef}
+        type="file"
+      />
       <OverlaySplitLayout>
         <OverlayNav footer={navFooter} groups={navGroups} />
 
@@ -310,7 +349,6 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
           ) : activeView.startsWith('config:') ? (
             <ConfigSettings
               activeSectionId={activeView.slice('config:'.length)}
-              importInputRef={importInputRef}
               onConfigSaved={onConfigSaved}
               onMainModelChanged={onMainModelChanged}
             />
