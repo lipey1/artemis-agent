@@ -140,6 +140,7 @@ import { snapHudBounds } from './hud-snap'
 import { createHudSnapShortcut } from './hud-snap-shortcut'
 import { buildHudWindowUrl } from './hud-url'
 import { createLinkTitleWindow, guardLinkTitleSession, readLinkTitleWindowTitle } from './link-title-window'
+import { clearStaleChromiumSingleton } from './clear-stale-singleton'
 import { ensureMainWindow } from './main-window-lifecycle'
 import {
   oauthGuardMayHardFail,
@@ -12156,6 +12157,21 @@ function registerDeepLinkProtocol() {
 // Single-instance lock: deep links on a running app (Win/Linux) arrive as a
 // second-instance argv. Without the lock a second `artemis://` launch spawns a
 // whole new app instead of routing into the running one.
+//
+// After a hard kill (pkill / kill -9) Chromium leaves SingletonLock pointing at
+// a dead PID. The next click then fails the lock and quits with no window —
+// user has to click twice. Clear that stale lock before requesting.
+try {
+  const stale = clearStaleChromiumSingleton(app.getPath('userData'))
+  if (stale.cleared) {
+    rememberLog(
+      `[boot] cleared stale Chromium singleton (dead pid ${stale.pid}; removed ${stale.removed.join(', ')})`
+    )
+  }
+} catch (err) {
+  rememberLog(`[boot] stale-singleton check failed: ${err instanceof Error ? err.message : String(err)}`)
+}
+
 const _gotSingleInstanceLock = app.requestSingleInstanceLock()
 
 if (!_gotSingleInstanceLock) {
@@ -12172,8 +12188,9 @@ if (!_gotSingleInstanceLock) {
       isReady: app.isReady(),
       createWindow,
       focusWindow,
-      // deep-link delivery focuses a live window after its renderer is ready.
-      focusExisting: !url
+      // Always focus/show on a second launch so a still-hidden boot window
+      // (show:false until ready-to-show) appears when the user clicks again.
+      focusExisting: true
     })
   })
 }
