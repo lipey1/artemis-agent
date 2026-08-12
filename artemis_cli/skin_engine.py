@@ -127,7 +127,7 @@ USAGE
 BUILT-IN SKINS
 ==============
 
-- ``default`` — Classic Artemis gold/kawaii (the current look)
+- ``default`` — Classic Artemis cyan (the current look)
 - ``ares``    — Crimson/bronze war-god theme with custom spinner wings
 - ``mono``    — Clean grayscale monochrome
 - ``slate``   — Cool blue developer-focused theme
@@ -993,7 +993,7 @@ def get_prompt_toolkit_style_overrides() -> Dict[str, str]:
     # `prompt` explicitly in their YAML.
     prompt = skin.get_color("prompt", "")
     input_rule = skin.get_color("input_rule", "#CD7F32")
-    title = skin.get_color("banner_title", "#FFD700")
+    title = skin.get_color("banner_title", "#67E8F9")
     text = skin.get_color("banner_text", "#FFF8DC")
     dim = skin.get_color("banner_dim", "#555555")
     label = skin.get_color("ui_label", title)

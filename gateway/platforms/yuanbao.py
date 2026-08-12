@@ -104,12 +104,12 @@ logger = logging.getLogger(__name__)
 # Version / platform constants (used in AUTH_BIND and sign-token headers)
 # ---------------------------------------------------------------------------
 try:
-    from artemis_cli import __version__ as _HERMES_VERSION
+    from artemis_cli import __version__ as _ARTEMIS_VERSION
 except ImportError:
-    _HERMES_VERSION = "0.0.0"
+    _ARTEMIS_VERSION = "0.0.0"
 
-_APP_VERSION = _HERMES_VERSION
-_BOT_VERSION = _HERMES_VERSION
+_APP_VERSION = _ARTEMIS_VERSION
+_BOT_VERSION = _ARTEMIS_VERSION
 _YUANBAO_INSTANCE_ID = str(ARTEMIS_INSTANCE_ID)  # single source: yuanbao_proto.ARTEMIS_INSTANCE_ID
 _OPERATION_SYSTEM = sys.platform
 

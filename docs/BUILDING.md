@@ -1,6 +1,6 @@
 # Building Artemis Desktop
 
-Artemis-only checkout. There is no Hermes compatibility layer in this repo.
+Artemis-only checkout. There is no Artemis compatibility layer in this repo.
 
 ## Requirements
 

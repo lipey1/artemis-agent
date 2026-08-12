@@ -209,7 +209,7 @@ def start_loop_liveness_watchdog(
     return _LoopLivenessWatchdogHandle(stop_event, thread)
 
 
-def _process_hermes_home() -> Path:
+def _process_artemis_home() -> Path:
     """ARTEMIS_HOME for process-level identity files (ignore profile overrides)."""
     val = os.environ.get("ARTEMIS_HOME", "").strip()
     if val:
@@ -219,13 +219,13 @@ def _process_hermes_home() -> Path:
 
 def get_loop_heartbeat_path(home: Optional[Path] = None) -> Path:
     """Return ``<ARTEMIS_HOME>/state/gateway.heartbeat``."""
-    base = home if home is not None else _process_hermes_home()
+    base = home if home is not None else _process_artemis_home()
     return base.joinpath(*_HEARTBEAT_RELATIVE)
 
 
 def get_shutdown_watchdog_dump_path(home: Optional[Path] = None) -> Path:
     """Return the faulthandler / metadata dump path for a fired watchdog."""
-    base = home if home is not None else _process_hermes_home()
+    base = home if home is not None else _process_artemis_home()
     return base.joinpath(*_WATCHDOG_DUMP_RELATIVE)
 
 

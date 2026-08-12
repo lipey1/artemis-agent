@@ -760,4 +760,4 @@ def _process_artemis_home() -> Path:
         return Path.home() / ".artemis"
 
 
-load_hermes_dotenv = load_artemis_dotenv
+load_artemis_dotenv = load_artemis_dotenv

@@ -10,9 +10,9 @@ Why tools instead of just shelling out to ``artemis kanban``?
 
 1. **Backend portability.** A worker whose terminal tool points at Docker
    / Modal / Singularity / SSH would run ``artemis kanban complete …``
-   inside the container, where ``hermes`` isn't installed and the DB
+   inside the container, where ``artemis`` isn't installed and the DB
    isn't mounted. Tools run in the agent's Python process, so they
-   always reach ``~/.hermes/kanban.db`` regardless of terminal backend.
+   always reach ``~/.artemis/kanban.db`` regardless of terminal backend.
 
 2. **No shell-quoting footguns.** Passing ``--metadata '{"x": [...]}'``
    through shlex+argparse is fragile. Structured tool args skip it.
@@ -221,7 +221,7 @@ def _connect(board: Optional[str] = None):
     default) preserves the legacy resolution chain
     (``ARTEMIS_KANBAN_DB`` → ``ARTEMIS_KANBAN_BOARD`` env → current symlink
     → ``default``). Per-tool ``board`` lets a Telegram-side agent override
-    the env-pinned active board without restarting Hermes.
+    the env-pinned active board without restarting Artemis.
     """
     from artemis_cli import kanban_db as kb
     return kb, kb.connect(board=board)
@@ -1095,7 +1095,7 @@ def _handle_comment(args: dict, **kw) -> str:
     # into the next worker's system prompt by ``build_worker_context``
     # as ``**{author}** (timestamp): {body}`` — accepting an
     # ``args["author"]`` override let a worker forge a comment from
-    # an authoritative-looking name like ``hermes-system`` and poison
+    # an authoritative-looking name like ``artemis-system`` and poison
     # the future-worker context with what reads as a system directive.
     # Cross-task commenting itself remains unrestricted (see #19713) —
     # comments are the deliberate handoff channel between tasks.
@@ -1215,7 +1215,7 @@ def _download_url_with_cap(url: str, max_bytes: int) -> tuple[bytes, Optional[st
         with httpx.stream(
             "GET",
             current_url,
-            headers={"User-Agent": "hermes-kanban/attach"},
+            headers={"User-Agent": "artemis-kanban/attach"},
             timeout=30,
             follow_redirects=False,
         ) as resp:
@@ -1241,7 +1241,7 @@ def _download_url_with_cap(url: str, max_bytes: int) -> tuple[bytes, Optional[st
 def _handle_attach_url(args: dict, **kw) -> str:
     """Attach a file fetched server-side from a URL.
 
-    The agent passes a URL; Hermes downloads it (with the shared size cap)
+    The agent passes a URL; Artemis downloads it (with the shared size cap)
     and stores it as a real attachment. Useful when the agent has a link
     rather than the bytes. Only http/https URLs are accepted.
     """
@@ -2070,7 +2070,7 @@ KANBAN_ATTACH_SCHEMA = {
 KANBAN_ATTACH_URL_SCHEMA = {
     "name": "kanban_attach_url",
     "description": (
-        "Attach a file to a task by URL — Hermes downloads it server-side "
+        "Attach a file to a task by URL — Artemis downloads it server-side "
         "and stores it as a real attachment (capped at 25 MB). Use when "
         "you have a link rather than the bytes. Only http/https URLs are "
         "accepted."

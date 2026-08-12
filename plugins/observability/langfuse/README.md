@@ -1,6 +1,6 @@
 # Langfuse Observability Plugin
 
-This plugin ships bundled with Hermes but is **opt-in** — it only loads when
+This plugin ships bundled with Artemis but is **opt-in** — it only loads when
 you explicitly enable it.
 
 ## Enable
@@ -9,16 +9,16 @@ Pick one:
 
 ```bash
 # Interactive: walks you through credentials + SDK install + enable
-hermes tools  # → Langfuse Observability
+artemis tools  # → Langfuse Observability
 
 # Manual
 pip install langfuse
-hermes plugins enable observability/langfuse
+artemis plugins enable observability/langfuse
 ```
 
 ## Required credentials
 
-Set these in `~/.hermes/.env` (or via `hermes tools`):
+Set these in `~/.artemis/.env` (or via `artemis tools`):
 
 ```bash
 ARTEMIS_LANGFUSE_PUBLIC_KEY=pk-lf-...
@@ -32,8 +32,8 @@ open.
 ## Verify
 
 ```bash
-hermes plugins list                 # observability/langfuse should show "enabled"
-hermes chat -q "hello"              # then check Langfuse for a "Hermes turn" trace
+artemis plugins list                 # observability/langfuse should show "enabled"
+artemis chat -q "hello"              # then check Langfuse for a "Artemis turn" trace
 ```
 
 ## Optional tuning
@@ -49,5 +49,5 @@ ARTEMIS_LANGFUSE_DEBUG=true           # verbose plugin logging
 ## Disable
 
 ```bash
-hermes plugins disable observability/langfuse
+artemis plugins disable observability/langfuse
 ```

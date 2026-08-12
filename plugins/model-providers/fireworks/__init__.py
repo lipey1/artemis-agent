@@ -9,7 +9,7 @@ Model IDs here track the canonical Fireworks catalog (fw-ai/fireconnect
 ``setup-cli``).
 """
 
-from artemis_cli import __version__ as _HERMES_VERSION
+from artemis_cli import __version__ as _ARTEMIS_VERSION
 from providers import register_provider
 from providers.base import ProviderProfile
 
@@ -24,13 +24,13 @@ fireworks = ProviderProfile(
     base_url="https://api.fireworks.ai/inference/v1",
     auth_type="api_key",
     # Attribution headers sent on every Fireworks request. Values match the
-    # canonical Hermes set in agent/auxiliary_client.py. Applied through the
+    # canonical Artemis set in agent/auxiliary_client.py. Applied through the
     # generic profile.default_headers path, so they survive switch_model and
     # credential rotation.
     default_headers={
         "HTTP-Referer": "https://artemis-agent.nousresearch.com",
-        "X-Title": "Hermes Agent",
-        "User-Agent": f"HermesAgent/{_HERMES_VERSION}",
+        "X-Title": "Artemis Agent",
+        "User-Agent": f"ArtemisAgent/{_ARTEMIS_VERSION}",
     },
     # Auxiliary model for cheap tasks (compaction, title generation, vision).
     # A standard pay-as-you-go catalog ``/models/`` ID.

@@ -1,5 +1,5 @@
 """
-Session-scoped context variables for the Hermes gateway.
+Session-scoped context variables for the Artemis gateway.
 
 Replaces the previous ``os.environ``-based session state
 (``ARTEMIS_SESSION_PLATFORM``, ``ARTEMIS_SESSION_CHAT_ID``, etc.) with
@@ -182,7 +182,7 @@ def set_current_session_id(session_id: str) -> None:
     # Skip the process-global os.environ write for delegated children. The
     # child's own tools and subprocesses still resolve their id through the
     # ContextVar (task-local), while the parent's process-wide env keeps the
-    # parent's session identity. See HermesPRDelegationSessionContext task.
+    # parent's session identity. See ArtemisPRDelegationSessionContext task.
     try:
         from agent.delegation_context import is_delegated_child_context
 

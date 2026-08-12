@@ -2369,7 +2369,7 @@ def _(rid, params: dict) -> dict:
     if err:
         return err
 
-    from artemis_constants import display_hermes_home
+    from artemis_constants import display_artemis_home
 
     key = session.get("session_key") or params.get("session_id") or ""
     agent = session.get("agent")
@@ -2417,10 +2417,10 @@ def _(rid, params: dict) -> dict:
     model = getattr(agent, "model", None) or mirror.get("model") or "(unknown)"
     project = _project_info_for_cwd(_display_session_cwd(session))
     lines = [
-        "Hermes TUI Status",
+        "Artemis TUI Status",
         "",
         f"Session ID: {key}",
-        f"Path: {display_hermes_home()}",
+        f"Path: {display_artemis_home()}",
     ]
     if project:
         lines.append(f"Project: {project['name']}")
@@ -2697,8 +2697,8 @@ def _(rid, params: dict) -> dict:
         return _ok(rid, result)
 
     agent = session["agent"]
-    # Mirror the classic CLI /save: snapshot under the Hermes profile home
-    # (~/.hermes/sessions/saved/) rather than the project/workspace CWD, and
+    # Mirror the classic CLI /save: snapshot under the Artemis profile home
+    # (~/.artemis/sessions/saved/) rather than the project/workspace CWD, and
     # include the system prompt so the export matches the dashboard save.
     saved_dir = get_artemis_home() / "sessions" / "saved"
     try:
@@ -2707,7 +2707,7 @@ def _(rid, params: dict) -> dict:
         return _err(rid, 5011, f"failed to create save directory {saved_dir}: {e}")
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    path = saved_dir / f"hermes_conversation_{timestamp}.json"
+    path = saved_dir / f"artemis_conversation_{timestamp}.json"
 
     with session["history_lock"]:
         messages = list(session.get("history", []))

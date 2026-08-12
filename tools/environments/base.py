@@ -1,4 +1,4 @@
-"""Base class for all Hermes execution environment backends.
+"""Base class for all Artemis execution environment backends.
 
 Unified spawn-per-call model: every command spawns a fresh ``bash -c`` process.
 A session snapshot (env vars, functions, aliases) is captured once at init and
@@ -312,14 +312,14 @@ def _pipe_stdin(proc: subprocess.Popen, data: str) -> None:
     surrogateescape decode, so original bytes are restored.  For
     surrogate-free strings it is byte-identical to strict UTF-8.
     Surrogates outside the round-trip range U+DC80–U+DCFF raise and are
-    recorded on ``proc._hermes_stdin_errors`` while stdin is still closed
+    recorded on ``proc._artemis_stdin_errors`` while stdin is still closed
     in ``finally`` so the child sees EOF instead of hanging;
     ``_wait_for_process`` reads the recorded error and surfaces it as
     ``stdin_error`` on the result.
     """
 
     errors: list[BaseException] = []
-    proc._hermes_stdin_errors = errors
+    proc._artemis_stdin_errors = errors
 
     def _write():
         if proc.stdin is None:
@@ -350,7 +350,7 @@ def _pipe_stdin(proc: subprocess.Popen, data: str) -> None:
                 pass
 
     thread = threading.Thread(target=_write, daemon=True)
-    proc._hermes_stdin_thread = thread
+    proc._artemis_stdin_thread = thread
     thread.start()
 
 
@@ -500,7 +500,7 @@ class _ThreadedProcessHandle:
 
 
 def _cwd_marker(session_id: str) -> str:
-    return f"__HERMES_CWD_{session_id}__"
+    return f"__ARTEMIS_CWD_{session_id}__"
 
 
 # Per-session variables that the gateway bridges freshly onto every command's
@@ -515,7 +515,7 @@ def _cwd_marker(session_id: str) -> str:
 # ARTEMIS_SESSION_ID leak via the shared snapshot). Stripping them from the
 # snapshot is safe because they are re-injected on every command; a snapshot
 # should only carry the user's own shell state (PATH, functions, exports they
-# set), not Hermes' per-turn session identity.
+# set), not Artemis' per-turn session identity.
 #
 # Kept in sync with gateway.session_context._VAR_MAP: every bridged name starts
 # with one of these prefixes (or is ARTEMIS_UI_SESSION_ID). Used by unit tests
@@ -586,7 +586,7 @@ def _export_dump_excluding_session_vars(
 
 
 class BaseEnvironment(ABC):
-    """Common interface and unified execution flow for all Hermes backends.
+    """Common interface and unified execution flow for all Artemis backends.
 
     Subclasses implement ``_run_bash()`` and ``cleanup()``.  The base class
     provides ``execute()`` with session snapshot sourcing, CWD tracking,
@@ -620,8 +620,8 @@ class BaseEnvironment(ABC):
 
         self._session_id = uuid.uuid4().hex[:12]
         temp_dir = self.get_temp_dir().rstrip("/") or "/"
-        self._snapshot_path = f"{temp_dir}/hermes-snap-{self._session_id}.sh"
-        self._cwd_file = f"{temp_dir}/hermes-cwd-{self._session_id}.txt"
+        self._snapshot_path = f"{temp_dir}/artemis-snap-{self._session_id}.sh"
+        self._cwd_file = f"{temp_dir}/artemis-cwd-{self._session_id}.txt"
         self._cwd_marker = _cwd_marker(self._session_id)
         self._snapshot_ready = False
         self._snapshot_passthrough_names: set[str] = set()
@@ -737,11 +737,11 @@ class BaseEnvironment(ABC):
         # letters, spaces) and the resulting path lives in a shell variable so
         # every later expansion is consistent.
         _snap_tmp_template = self._quote_shell_path(self._snapshot_path + ".tmp.XXXXXXXXXX")
-        _snap_tmp = '"$__hermes_snap_tmp"'
+        _snap_tmp = '"$__artemis_snap_tmp"'
         snapshot_excluded = self._snapshot_excluded_passthrough_names()
         bootstrap = (
             f"umask 077\n"
-            f"__hermes_snap_tmp=$(mktemp {_snap_tmp_template}) || exit 1\n"
+            f"__artemis_snap_tmp=$(mktemp {_snap_tmp_template}) || exit 1\n"
             f"{_export_dump_excluding_session_vars(_snap_tmp, snapshot_excluded)}\n"
             # Dump function definitions, filtering out private (``_``-prefixed)
             # helpers — mainly bash-completion internals (``_git``, ``_make``…)
@@ -755,8 +755,8 @@ class BaseEnvironment(ABC):
             # ``declare -f`` with no name args dumps ALL functions, so an empty
             # name list (only private funcs present) would otherwise leak the
             # very functions we meant to drop.
-            f"__hermes_fns=$(declare -F | awk '{{print $3}}' | grep -vE '^_[^_]') || true\n"
-            f"[ -n \"$__hermes_fns\" ] && declare -f $__hermes_fns "
+            f"__artemis_fns=$(declare -F | awk '{{print $3}}' | grep -vE '^_[^_]') || true\n"
+            f"[ -n \"$__artemis_fns\" ] && declare -f $__artemis_fns "
             f">> {_snap_tmp} 2>/dev/null || true\n"
             f"alias -p >> {_snap_tmp}\n"
             f"echo 'shopt -s expand_aliases' >> {_snap_tmp}\n"
@@ -856,7 +856,7 @@ class BaseEnvironment(ABC):
         # is shared by ``&``-launched subshells.  Template shell-quoted
         # (Windows/spaces); the allocated path lives in a shell variable.
         _snap_tmp_template = self._quote_shell_path(self._snapshot_path + ".tmp.XXXXXXXXXX")
-        _snap_tmp = '"$__hermes_snap_tmp"'
+        _snap_tmp = '"$__artemis_snap_tmp"'
 
         parts = []
         passthrough_names = self._snapshot_excluded_passthrough_names()
@@ -868,7 +868,7 @@ class BaseEnvironment(ABC):
         # string, so secrets are not exposed through process arguments/logs.
         saved_names: list[tuple[str, str, str]] = []
         for name in passthrough_names:
-            marker = f"_HERMES_RUNTIME_PASSTHROUGH_{name}"
+            marker = f"_ARTEMIS_RUNTIME_PASSTHROUGH_{name}"
             present = f"{marker}_PRESENT"
             value = f"{marker}_VALUE"
             saved_names.append((name, present, value))
@@ -894,17 +894,17 @@ class BaseEnvironment(ABC):
             parts.append(f"unset {present} {value}")
 
         # Harness attribution: every tool subprocess advertises that it runs
-        # under Hermes via the cross-agent ``AI_AGENT`` standard (read by e.g.
-        # huggingface_hub's agent detection) plus the Hermes-specific
+        # under Artemis via the cross-agent ``AI_AGENT`` standard (read by e.g.
+        # huggingface_hub's agent detection) plus the Artemis-specific
         # ``ARTEMIS_AGENT`` marker.  The value MUST equal our id in the public
         # agent-harness registry (``artemis-agent`` — see huggingface.js
         # ``agent-harnesses.ts``); standard-var matching is exact, so any other
         # value is reported as "unknown".  Setting it here (rather than only in
         # the host process env) is what carries the marker into REMOTE backends
         # (Docker/SSH/Modal/Daytona/Singularity/Vercel), whose exec env is not
-        # inherited from the Hermes process.  ``${VAR:-default}`` semantics:
+        # inherited from the Artemis process.  ``${VAR:-default}`` semantics:
         # never clobber an outer harness value that arrived via the inherited
-        # process env (Hermes running inside another agent's terminal).
+        # process env (Artemis running inside another agent's terminal).
         parts.append(
             'export AI_AGENT="${AI_AGENT:-artemis-agent}" '
             'ARTEMIS_AGENT="${ARTEMIS_AGENT:-true}"'
@@ -918,8 +918,8 @@ class BaseEnvironment(ABC):
 
         # Run the actual command
         parts.append(f"eval '{escaped}'")
-        parts.append("__hermes_ec=$?")
-        # Restrict Hermes metadata files without changing the user's command
+        parts.append("__artemis_ec=$?")
+        # Restrict Artemis metadata files without changing the user's command
         # umask. Snapshot files may contain env-carried secrets.
         parts.append("umask 077")
 
@@ -933,7 +933,7 @@ class BaseEnvironment(ABC):
         # that later expands the ``mv`` operand, keeping both consistent.
         if self._snapshot_ready:
             parts.append(
-                f"__hermes_snap_tmp=$(mktemp {_snap_tmp_template}) && "
+                f"__artemis_snap_tmp=$(mktemp {_snap_tmp_template}) && "
                 f"{{ {_export_dump_excluding_session_vars(_snap_tmp, passthrough_names)} "
                 f"&& mv -f {_snap_tmp} {_quoted_snap}; }} "
                 f"2>/dev/null || rm -f {_snap_tmp} 2>/dev/null || true"
@@ -948,7 +948,7 @@ class BaseEnvironment(ABC):
         parts.append(
             f"printf '\\n{self._cwd_marker}%s{self._cwd_marker}\\n' \"$(pwd -P)\""
         )
-        parts.append("exit $__hermes_ec")
+        parts.append("exit $__artemis_ec")
 
         return "\n".join(parts)
 
@@ -1290,12 +1290,12 @@ class BaseEnvironment(ABC):
         # recorded encode failure, silently dropping it. The thread cannot
         # block long after child exit (write raises BrokenPipeError once the
         # pipe closes); the timeout is a pure safety net.
-        stdin_thread = getattr(proc, "_hermes_stdin_thread", None)
+        stdin_thread = getattr(proc, "_artemis_stdin_thread", None)
         if stdin_thread is not None:
             stdin_thread.join(timeout=5)
         rendered = output.render()
         result = self._finalize_wait_result(output, rendered, proc.returncode)
-        stdin_errors = getattr(proc, "_hermes_stdin_errors", None)
+        stdin_errors = getattr(proc, "_artemis_stdin_errors", None)
         if stdin_errors:
             err = str(stdin_errors[0])
             result["stdin_error"] = err
@@ -1329,7 +1329,7 @@ class BaseEnvironment(ABC):
         self._extract_cwd_from_output(result)
 
     def _extract_cwd_from_output(self, result: dict):
-        """Parse the __HERMES_CWD_{session}__ marker from stdout output.
+        """Parse the __ARTEMIS_CWD_{session}__ marker from stdout output.
 
         Updates self.cwd and strips the marker from result["output"].
         Used by remote backends (Docker, SSH, Modal, Daytona, Singularity).

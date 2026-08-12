@@ -1,4 +1,4 @@
-"""disk_cleanup — ephemeral file cleanup for Hermes Agent.
+"""disk_cleanup — ephemeral file cleanup for Artemis Agent.
 
 Library module wrapping the deterministic cleanup rules written by
 @LVT382009 in PR #12212. The plugin ``__init__.py`` wires these
@@ -15,8 +15,8 @@ Rules:
   - chrome-profile→ prompt after 14 days (deep only)
   - >500 MB files → prompt always (deep only)
 
-Scope: strictly ARTEMIS_HOME and /tmp/hermes-*
-Never touches: ~/.hermes/logs/ or any system directory.
+Scope: strictly ARTEMIS_HOME and /tmp/artemis-*
+Never touches: ~/.artemis/logs/ or any system directory.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ except Exception:  # pragma: no cover — plugin may load before constants resol
 
     def get_artemis_home() -> Path:  # type: ignore[no-redef]
         val = (os.environ.get("ARTEMIS_HOME") or "").strip()
-        return Path(val).resolve() if val else (Path.home() / ".hermes").resolve()
+        return Path(val).resolve() if val else (Path.home() / ".artemis").resolve()
 
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,7 @@ def get_log_file() -> Path:
 # ---------------------------------------------------------------------------
 
 def is_safe_path(path: Path) -> bool:
-    """Accept only paths under ARTEMIS_HOME or ``/tmp/hermes-*``.
+    """Accept only paths under ARTEMIS_HOME or ``/tmp/artemis-*``.
 
     Rejects Windows mounts (``/mnt/c`` etc.) and any system directory.
     """
@@ -74,9 +74,9 @@ def is_safe_path(path: Path) -> bool:
         return True
     except (ValueError, OSError):
         pass
-    # Allow /tmp/hermes-* explicitly
+    # Allow /tmp/artemis-* explicitly
     parts = path.parts
-    if len(parts) >= 3 and parts[1] == "tmp" and parts[2].startswith("hermes-"):
+    if len(parts) >= 3 and parts[1] == "tmp" and parts[2].startswith("artemis-"):
         return True
     return False
 
@@ -383,7 +383,7 @@ def quick() -> Dict[str, Any]:
             new_tracked.append(item)
 
     # Remove empty dirs under ARTEMIS_HOME, but never recurse into known
-    # durable state trees.  Some installs place the Hermes checkout, venv,
+    # durable state trees.  Some installs place the Artemis checkout, venv,
     # and desktop build under ARTEMIS_HOME; a full rglob over that tree can
     # stall the gateway event loop for minutes.
     artemis_home = get_artemis_home()
@@ -600,7 +600,7 @@ def guess_category(path: Path) -> Optional[str]:
         if top == "cache":
             return "temp"
     except ValueError:
-        # Path isn't under ARTEMIS_HOME (e.g. /tmp/hermes-*) — fall through.
+        # Path isn't under ARTEMIS_HOME (e.g. /tmp/artemis-*) — fall through.
         pass
 
     name = path.name

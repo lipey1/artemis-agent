@@ -44,9 +44,9 @@ def _consume_detached_handler_exception(task: "asyncio.Task") -> None:
         )
 
 
-# Audio file extensions Hermes recognizes for native audio delivery.
+# Audio file extensions Artemis recognizes for native audio delivery.
 # Keep Telegram's narrower attachment/voice sets below separate: formats such
-# as MPEG-2 Layer II are audio to Hermes but unsupported by sendAudio/sendVoice.
+# as MPEG-2 Layer II are audio to Artemis but unsupported by sendAudio/sendVoice.
 _AUDIO_MIME_TYPES = {
     ".ogg": "audio/ogg",
     ".opus": "audio/opus",
@@ -96,7 +96,7 @@ def _thread_metadata_for_source(source, reply_to_message_id: str | None = None) 
     """Build platform-aware thread metadata for adapter sends.
 
     Most platforms route threaded sends with a generic ``thread_id`` metadata
-    value. Telegram private-chat topics created through Hermes' DM-topic helper
+    value. Telegram private-chat topics created through Artemis' DM-topic helper
     are exposed in updates as ``message_thread_id`` plus a reply anchor. Live
     user-message replies route with ``message_thread_id`` + ``reply_to_message_id``;
     synthetic/resumed sends that have no reply anchor fall back to Telegram's
@@ -136,7 +136,7 @@ def _reply_anchor_for_event(event) -> str | None:
     """Return reply_to id for platforms that need reply semantics.
 
     Telegram forum/supergroup topics should be routed by topic metadata, not by
-    replying to the triggering message. Hermes-created Telegram private-chat
+    replying to the triggering message. Artemis-created Telegram private-chat
     topic lanes prefer replying to the triggering user message so the answer
     stays attached to the active lane; synthetic/resumed sends fall back to
     ``direct_messages_topic_id`` metadata when no message id is available.
@@ -148,7 +148,7 @@ def _reply_anchor_for_event(event) -> str | None:
     if (
         platform == "slack"
         and isinstance(raw_message, dict)
-        and raw_message.get("_hermes_no_thread_response")
+        and raw_message.get("_artemis_no_thread_response")
     ):
         # Slack reaction handoffs into a configured target channel are meant
         # to create a new top-level message there. Returning the synthetic
@@ -209,7 +209,7 @@ def build_auto_tts_output_path(platform) -> str:
     ext = "ogg" if _platform_name(platform) in OPUS_VOICE_PLATFORMS else "mp3"
     audio_path = os.path.join(
         tempfile.gettempdir(),
-        "hermes_voice",
+        "artemis_voice",
         f"tts_reply_{uuid.uuid4().hex[:12]}.{ext}",
     )
     os.makedirs(os.path.dirname(audio_path), exist_ok=True)
@@ -578,7 +578,7 @@ sys.path.insert(0, str(_Path(__file__).resolve().parents[2]))
 
 from gateway.config import Platform, PlatformConfig
 from gateway.session import SessionSource, build_session_key
-from artemis_constants import get_default_hermes_root, get_artemis_dir, get_artemis_home
+from artemis_constants import get_default_artemis_root, get_artemis_dir, get_artemis_home
 
 if TYPE_CHECKING:
     from agent.display import ToolPreview
@@ -655,7 +655,7 @@ def streaming_tts_should_skip_whole_file(
 
 GATEWAY_SECRET_CAPTURE_UNSUPPORTED_MESSAGE = (
     "Secure secret entry is not supported over messaging. "
-    "Load this skill in the local CLI to be prompted, or add the key to ~/.hermes/.env manually."
+    "Load this skill in the local CLI to be prompted, or add the key to ~/.artemis/.env manually."
 )
 
 
@@ -916,7 +916,7 @@ async def cache_image_from_url(url: str, ext: str = ".jpg", retries: int = 2) ->
                     "GET",
                     url,
                     headers={
-                        "User-Agent": "Mozilla/5.0 (compatible; HermesAgent/1.0)",
+                        "User-Agent": "Mozilla/5.0 (compatible; ArtemisAgent/1.0)",
                         "Accept": "image/*,*/*;q=0.8",
                     },
                 ) as response:
@@ -1058,7 +1058,7 @@ async def cache_audio_from_url(url: str, ext: str = ".ogg", retries: int = 2) ->
                     "GET",
                     url,
                     headers={
-                        "User-Agent": "Mozilla/5.0 (compatible; HermesAgent/1.0)",
+                        "User-Agent": "Mozilla/5.0 (compatible; ArtemisAgent/1.0)",
                         "Accept": "audio/*,*/*;q=0.8",
                     },
                 ) as response:
@@ -1176,7 +1176,7 @@ _CACHE_DIR_IMPORT_DEFAULTS = {
 }
 
 _ARTEMIS_HOME = get_artemis_home()
-_HERMES_ROOT = get_default_hermes_root()
+_ARTEMIS_ROOT = get_default_artemis_root()
 MEDIA_DELIVERY_ALLOW_DIRS_ENV = "ARTEMIS_MEDIA_ALLOW_DIRS"
 MEDIA_DELIVERY_TRUST_RECENT_ENV = "ARTEMIS_MEDIA_TRUST_RECENT_FILES"
 MEDIA_DELIVERY_TRUST_RECENT_SECONDS_ENV = "ARTEMIS_MEDIA_TRUST_RECENT_SECONDS"
@@ -1263,7 +1263,7 @@ _MEDIA_DELIVERY_CACHE_SUBDIRS = (
 
 
 def _profile_cache_roots() -> List[Path]:
-    """Return per-profile canonical cache roots under the shared Hermes root.
+    """Return per-profile canonical cache roots under the shared Artemis root.
 
     Profile gateways write generated artifacts to
     ``<root>/profiles/<name>/cache/{images,audio,...}``. The static safe-roots
@@ -1276,7 +1276,7 @@ def _profile_cache_roots() -> List[Path]:
     denied prefix and $HOME is not that prefix). See issue #31733.
     """
     roots: List[Path] = []
-    profiles_dir = _HERMES_ROOT / "profiles"
+    profiles_dir = _ARTEMIS_ROOT / "profiles"
     try:
         profile_dirs = [p for p in profiles_dir.iterdir() if p.is_dir()]
     except OSError:
@@ -1293,7 +1293,7 @@ def _kanban_attachment_roots() -> List[Path]:
     if override:
         return [Path(override).expanduser()]
     home_override = os.environ.get("ARTEMIS_KANBAN_HOME", "").strip()
-    root = Path(home_override).expanduser() if home_override else _HERMES_ROOT
+    root = Path(home_override).expanduser() if home_override else _ARTEMIS_ROOT
     roots = [root / "kanban" / "attachments"]
     boards_root = root / "kanban" / "boards"
     try:
@@ -1365,7 +1365,7 @@ def _media_delivery_denied_paths() -> List[Path]:
     home = Path(os.path.expanduser("~"))
     for sub in _MEDIA_DELIVERY_DENIED_HOME_SUBPATHS:
         denied.append(home / sub)
-    # The active Hermes profile and shared Hermes root both contain control
+    # The active Artemis profile and shared Artemis root both contain control
     # files and credentials. Only cache subdirectories under them are
     # explicitly allowlisted above (matched BEFORE this denylist in
     # validate_media_delivery_path, so generated media still delivers).
@@ -1376,7 +1376,7 @@ def _media_delivery_denied_paths() -> List[Path]:
     # delivery (read/exfil) side can't trail the write side: a credential the
     # agent is forbidden to write or read must also never be auto-attached to a
     # chat reply. Enumerated explicitly per-file rather than denying the whole
-    # tree, so skills/, logs/, and ad-hoc agent-written files under ~/.hermes
+    # tree, so skills/, logs/, and ad-hoc agent-written files under ~/.artemis
     # stay deliverable (see #32090, #34425).
     _ROOT_CREDENTIAL_FILES = (
         ".env",
@@ -1411,11 +1411,11 @@ def _media_delivery_denied_paths() -> List[Path]:
         "pairing",
         "mcp-tokens",
     )
-    for hermes_root in (_ARTEMIS_HOME, _HERMES_ROOT):
+    for artemis_root in (_ARTEMIS_HOME, _ARTEMIS_ROOT):
         for rel in _ROOT_CREDENTIAL_FILES:
-            denied.append(hermes_root / rel)
+            denied.append(artemis_root / rel)
         for rel in _ROOT_CREDENTIAL_DIRS:
-            denied.append(hermes_root / rel)
+            denied.append(artemis_root / rel)
     return denied
 
 
@@ -1427,8 +1427,8 @@ def _path_under_denied_prefix(resolved: Path) -> bool:
     denylist so that a non-root gateway can't deliver another user's home, but
     on a root-run gateway ``$HOME=/root`` and the operator's own deliverables
     (``/root/work/proposal.docx``) live directly under it. The credential
-    sub-directories inside home (``~/.ssh``, ``~/.aws``, ...) and Hermes
-    secrets (``~/.hermes/.env``, ``auth.json``) are *separate, more-specific*
+    sub-directories inside home (``~/.ssh``, ``~/.aws``, ...) and Artemis
+    secrets (``~/.artemis/.env``, ``auth.json``) are *separate, more-specific*
     denied paths, so they stay blocked regardless of this exception — it can
     only un-block a plain file sitting in the running user's home tree, never a
     credential location or another user's home.
@@ -1592,9 +1592,9 @@ def _docker_persistent_home_host_root() -> Optional[Path]:
 
 
 def _cache_dir_container_mounts() -> List[Tuple[Path, Path]]:
-    """(host, container) pairs for the auto-mounted Hermes cache dirs.
+    """(host, container) pairs for the auto-mounted Artemis cache dirs.
 
-    The agent legitimately sees generated artifacts at ``/root/.hermes/...``
+    The agent legitimately sees generated artifacts at ``/root/.artemis/...``
     (``agent_visible_image`` from image_generate, cache-dir reads) and will
     naturally emit those container paths in MEDIA tags. These mounts are
     longer prefixes than the ``/root`` home mount, so longest-prefix matching
@@ -1617,7 +1617,7 @@ def _translate_docker_container_media_path(candidate: Path) -> Optional[Path]:
     """Translate a container-absolute path to its host path when possible.
 
     Uses longest-prefix match across configured ``docker_volumes``, the
-    auto-mounted Hermes cache dirs (``/root/.hermes/...``), the default
+    auto-mounted Artemis cache dirs (``/root/.artemis/...``), the default
     persistent Docker ``/workspace`` host root, and the persistent ``/root``
     home mount.
     """
@@ -1642,17 +1642,17 @@ def _translate_docker_container_media_path(candidate: Path) -> Optional[Path]:
     if default_ws is not None and not any(c.as_posix() == "/workspace" for _, c in mounts):
         mounts.append((default_ws, Path("/workspace")))
     # Synthetic /root mount for the persistent home bind. Cache mounts above
-    # are longer prefixes, so /root/.hermes/... still translates to the host
+    # are longer prefixes, so /root/.artemis/... still translates to the host
     # cache — this only catches stray home writes like /root/out.png.
     default_home = _docker_persistent_home_host_root()
     if default_home is not None and not any(c.as_posix() == "/root" for _, c in mounts):
-        # /root/.hermes/* that did NOT match a cache mount is the container's
+        # /root/.artemis/* that did NOT match a cache mount is the container's
         # credential/secret surface (.env, auth.json, ... are individually
         # bind-mounted from the real host stores). Translating those through
         # the home mount would resolve to sandbox-home copies OUTSIDE the
         # host-side credential denylist prefixes — refuse instead so the
         # normal "container path doesn't exist on host" rejection applies.
-        if not candidate.as_posix().startswith("/root/.hermes"):
+        if not candidate.as_posix().startswith("/root/.artemis"):
             mounts.append((default_home, Path("/root")))
 
     if not mounts:
@@ -1693,7 +1693,7 @@ def validate_media_delivery_path(path: str) -> Optional[str]:
 
     Strict mode (opt-in via ``gateway.strict`` in ``config.yaml`` or
     ``ARTEMIS_MEDIA_DELIVERY_STRICT=1``): the file MUST live under a
-    Hermes-managed cache, under an operator-allowlisted root
+    Artemis-managed cache, under an operator-allowlisted root
     (``ARTEMIS_MEDIA_ALLOW_DIRS``), or be freshly produced inside the
     configured recency window. Suitable for public-facing bots where
     prompt injection from one user shouldn't be able to exfiltrate the
@@ -1746,11 +1746,11 @@ def validate_media_delivery_path(path: str) -> Optional[str]:
 
     # Non-strict mode (default): accept anything not on the denylist.
     # The denylist still blocks /etc, /proc, ~/.ssh, ~/.aws, and the
-    # credential/secret stores under the Hermes root (~/.hermes/.env,
+    # credential/secret stores under the Artemis root (~/.artemis/.env,
     # auth.json, .anthropic_oauth.json, google_token.json, pairing/, ...) —
     # so the obvious prompt-injection / credential-exfil sites
     # (``MEDIA:/etc/passwd``, ``MEDIA:~/.ssh/id_rsa``,
-    # ``MEDIA:~/.hermes/google_token.json``) remain rejected.
+    # ``MEDIA:~/.artemis/google_token.json``) remain rejected.
     if not _media_delivery_strict_mode():
         if _path_under_denied_prefix(resolved):
             return None
@@ -2417,8 +2417,8 @@ class TextDebounceState:
 
 _PLAINTEXT_GATEWAY_RESTART_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"^(?:please\s+)?restart\s+(?:the\s+)?gateway[.!?\s]*$", re.IGNORECASE),
-    re.compile(r"^(?:please\s+)?restart\s+(?:the\s+)?hermes\s+gateway[.!?\s]*$", re.IGNORECASE),
-    re.compile(r"^(?:please\s+)?restart\s+hermes[.!?\s]*$", re.IGNORECASE),
+    re.compile(r"^(?:please\s+)?restart\s+(?:the\s+)?artemis\s+gateway[.!?\s]*$", re.IGNORECASE),
+    re.compile(r"^(?:please\s+)?restart\s+artemis[.!?\s]*$", re.IGNORECASE),
 )
 
 
@@ -2947,7 +2947,7 @@ class BasePlatformAdapter(ABC):
     splits_long_messages: bool = False
 
     # The command prefix users can always TYPE on this platform to reach
-    # Hermes commands.  Default "/" (most platforms deliver "/approve" etc.
+    # Artemis commands.  Default "/" (most platforms deliver "/approve" etc.
     # as plain message text).  Platforms where typing a leading "/" is
     # intercepted or restricted by the client (Slack blocks native slash
     # commands inside threads; Matrix clients reserve "/" for client-local
@@ -3223,7 +3223,7 @@ class BasePlatformAdapter(ABC):
         final-editing the preview.
 
         Some adapters can send richer final messages than their current edit
-        implementation supports. Telegram is the motivating case: Hermes sends
+        implementation supports. Telegram is the motivating case: Artemis sends
         final replies through ``sendRichMessage`` but still finalizes streamed
         previews through its existing MarkdownV2 edit path until Bot API 10.1's
         ``rich_message`` edit parameter is wired directly. Such adapters
@@ -4448,7 +4448,7 @@ class BasePlatformAdapter(ABC):
         Override in subclasses to send audio as voice bubbles (Telegram)
         or file attachments (Discord). Default falls back to a friendly
         notice — never echo the local audio_path into chat, since it is a
-        host filesystem path that would leak the Hermes home layout.
+        host filesystem path that would leak the Artemis home layout.
         """
         # audio_path is intentionally NOT included in the chat text — it is a
         # host-local path that leaks filesystem layout. The path is logged for
@@ -4594,7 +4594,7 @@ class BasePlatformAdapter(ABC):
         Override in subclasses to send videos as inline playable media.
         Default falls back to a friendly notice — never echo the local
         video_path into chat, since it is a host filesystem path that
-        would leak the Hermes home layout.
+        would leak the Artemis home layout.
         """
         # See send_voice for the rationale: do not echo host paths into chat.
         logger.warning(
@@ -4622,7 +4622,7 @@ class BasePlatformAdapter(ABC):
         Override in subclasses to send files as downloadable attachments.
         Default falls back to a friendly notice — never echo the local
         file_path into chat, since it is a host filesystem path that
-        would leak the Hermes home layout.
+        would leak the Artemis home layout.
         """
         # See send_voice for the rationale: do not echo host paths into chat.
         logger.warning(
@@ -4695,7 +4695,7 @@ class BasePlatformAdapter(ABC):
         Override in subclasses for native photo attachments. Default falls
         back to a friendly notice — never echo the local image_path into
         chat, since it is a host filesystem path that would leak the
-        Hermes home layout.
+        Artemis home layout.
         """
         # See send_voice for the rationale: do not echo host paths into chat.
         logger.warning(
@@ -4797,7 +4797,7 @@ class BasePlatformAdapter(ABC):
 
         Serialized tool results frequently embed a previous reply's text, e.g.::
 
-            {"result": "MEDIA:/Users/x/.hermes/media/generated/stale.png"}
+            {"result": "MEDIA:/Users/x/.artemis/media/generated/stale.png"}
 
         Here the ``MEDIA:`` is part of stored text, not an outbound directive,
         but the bare-path branch of ``MEDIA_TAG_CLEANUP_RE`` would still match it
@@ -6345,7 +6345,7 @@ class BasePlatformAdapter(ABC):
                         and not media_files
                         and not self._streaming_tts_turn_completed(
                             session_key,
-                            getattr(interrupt_event, "_hermes_run_generation", None),
+                            getattr(interrupt_event, "_artemis_run_generation", None),
                             event=event,
                         )):
                     try:
@@ -6682,7 +6682,7 @@ class BasePlatformAdapter(ABC):
             self._streaming_tts_completed_turns.discard(
                 self._streaming_tts_turn_key(
                     session_key,
-                    getattr(interrupt_event, "_hermes_run_generation", None),
+                    getattr(interrupt_event, "_artemis_run_generation", None),
                     event=event,
                 )
                 or ""
@@ -6775,7 +6775,7 @@ class BasePlatformAdapter(ABC):
             # session (e.g. deferred background-review notifications).
             #
             # Snapshot the callback generation HERE (after the agent has run),
-            # not at the top of this task.  _hermes_run_generation is set on
+            # not at the top of this task.  _artemis_run_generation is set on
             # the interrupt event by GatewayRunner._bind_adapter_run_generation
             # during _handle_message_with_agent — which happens DURING the
             # self._message_handler(event) await above.  Snapshotting earlier
@@ -6784,7 +6784,7 @@ class BasePlatformAdapter(ABC):
             # fresher run's callbacks.
             _callback_generation = getattr(
                 interrupt_event,
-                "_hermes_run_generation",
+                "_artemis_run_generation",
                 None,
             )
             if hasattr(self, "pop_post_delivery_callback"):

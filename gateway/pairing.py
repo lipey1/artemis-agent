@@ -15,7 +15,7 @@ Security features (based on OWASP + NIST SP 800-63-4 guidance):
   - File permissions: chmod 0600 on all data files
   - Codes are never logged to stdout
 
-Storage: ~/.hermes/pairing/
+Storage: ~/.artemis/pairing/
 """
 
 import hashlib
@@ -34,7 +34,7 @@ from gateway.whatsapp_identity import (
     normalize_whatsapp_identifier,
 )
 from artemis_constants import (
-    get_default_hermes_root,
+    get_default_artemis_root,
     get_artemis_dir,
     get_artemis_home,
 )
@@ -422,7 +422,7 @@ class PairingStore:
         # Resolve storage directory lazily — tests use a temp ARTEMIS_HOME
         # and PairingStore may be constructed before the env is set.
         if profile:
-            root = get_default_hermes_root()
+            root = get_default_artemis_root()
             profile_home = (
                 root
                 if profile == "default"
@@ -471,7 +471,7 @@ class PairingStore:
             except PermissionError as e:
                 # Surface this loudly: a 0600 file owned by a different user
                 # (classic Docker symptom: `docker exec` runs as root and writes
-                # the file, then the gateway process — running as `hermes` after
+                # the file, then the gateway process — running as `artemis` after
                 # gosu drop — can't read it) would otherwise be swallowed by
                 # the generic OSError branch below, silently leaving the user
                 # marked unauthorized. See issue #10270.
@@ -736,7 +736,7 @@ class PairingStore:
         """
         Approve a pending pairing request by its server-side request id.
 
-        This is the grant path for authenticated admin surfaces (``hermes
+        This is the grant path for authenticated admin surfaces (``artemis
         pairing list``, the dashboard/desktop approve buttons), which show
         pending requests but must never reveal the one-time code DM'd to the
         user. Returns ``{user_id, user_name}`` on success, ``None`` for an

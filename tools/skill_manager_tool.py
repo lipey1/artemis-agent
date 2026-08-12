@@ -4,7 +4,7 @@ Skill Manager Tool -- Agent-Managed Skill Creation & Editing
 
 Allows the agent to create, update, and delete skills, turning successful
 approaches into reusable procedural knowledge. New skills are created in
-~/.hermes/skills/. Existing skills (bundled, hub-installed, or user-created)
+~/.artemis/skills/. Existing skills (bundled, hub-installed, or user-created)
 can be modified or deleted wherever they live.
 
 Skills are the agent's procedural memory: they capture *how to do a specific
@@ -20,7 +20,7 @@ Actions:
   remove_file-- Remove a supporting file from a user skill
 
 Directory layout for user skills:
-    ~/.hermes/skills/
+    ~/.artemis/skills/
     ├── my-skill/
     │   ├── SKILL.md
     │   ├── references/
@@ -40,7 +40,7 @@ import contextvars as _ctxvars
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from artemis_constants import get_artemis_home, display_hermes_home
+from artemis_constants import get_artemis_home, display_artemis_home
 from utils import atomic_write_text, is_truthy_value
 from artemis_cli.config import cfg_get
 from agent.skill_utils import (
@@ -151,7 +151,7 @@ def _security_scan_skill(skill_dir: Path) -> Optional[str]:
 import yaml
 
 
-# All skills live in ~/.hermes/skills/ (single source of truth)
+# All skills live in ~/.artemis/skills/ (single source of truth)
 ARTEMIS_HOME = get_artemis_home()
 SKILLS_DIR = ARTEMIS_HOME / "skills"
 _SKILLS_DIR_AT_IMPORT = SKILLS_DIR
@@ -646,7 +646,7 @@ def _find_skill(name: str) -> Optional[Dict[str, Any]]:
     """
     Find a skill by name across all skill directories.
 
-    Searches the local skills dir (~/.hermes/skills/) first, then any
+    Searches the local skills dir (~/.artemis/skills/) first, then any
     external dirs configured via skills.external_dirs.  Returns
     {"path": Path} or None.
     """
@@ -738,7 +738,7 @@ def _org_mirror_write_guard(name: str, skill_path: Path, action: str) -> Optiona
 
 
 def _find_skill_in_other_profiles(name: str) -> List[Tuple[str, Path]]:
-    """Look for ``name`` under SKILL.md across OTHER Hermes profiles.
+    """Look for ``name`` under SKILL.md across OTHER Artemis profiles.
 
     Returns a list of ``(profile_name, skill_dir)`` pairs. Used to make
     the "Skill X not found" error explain when the user is editing the
@@ -748,13 +748,13 @@ def _find_skill_in_other_profiles(name: str) -> List[Tuple[str, Path]]:
     """
     matches: List[Tuple[str, Path]] = []
     try:
-        from artemis_constants import get_default_hermes_root
+        from artemis_constants import get_default_artemis_root
         from agent.skill_utils import is_excluded_skill_path
     except Exception:
         return matches
 
     try:
-        root = get_default_hermes_root()
+        root = get_default_artemis_root()
     except Exception:
         return matches
 
@@ -764,7 +764,7 @@ def _find_skill_in_other_profiles(name: str) -> List[Tuple[str, Path]]:
     active_dir = _active.resolve() if _active.exists() else _active
     candidates: List[Tuple[str, Path]] = []
 
-    # Default profile (~/.hermes/skills) — only consider when active is non-default.
+    # Default profile (~/.artemis/skills) — only consider when active is non-default.
     default_skills = root / "skills"
     try:
         if default_skills.resolve() != active_dir:
@@ -772,7 +772,7 @@ def _find_skill_in_other_profiles(name: str) -> List[Tuple[str, Path]]:
     except (OSError, RuntimeError):
         pass
 
-    # All named profiles (~/.hermes/profiles/*/skills)
+    # All named profiles (~/.artemis/profiles/*/skills)
     profiles_root = root / "profiles"
     if profiles_root.is_dir():
         try:
@@ -999,7 +999,7 @@ def _attach_lint_findings(result: Dict[str, Any], skill_md: Path) -> None:
     result["lint_hint"] = (
         "The skill was created. These are advisory authoring-convention "
         "findings (not blockers) — fix them with skill_manage(action='patch') "
-        "to match Hermes skill standards."
+        "to match Artemis skill standards."
     )
 
 
@@ -1251,7 +1251,7 @@ def _delete_skill(name: str, absorbed_into: Optional[str] = None) -> Dict[str, A
         return {"success": False, "error": unsafe}
 
     # During the curator consolidation pass, a verified consolidation must be
-    # RECOVERABLE: archival into ~/.hermes/skills/.archive/ is documented as
+    # RECOVERABLE: archival into ~/.artemis/skills/.archive/ is documented as
     # the maximum destructive action the curator may take, and
     # `artemis curator restore` promises the skill can be brought back. Route
     # through the recoverable archive primitive instead of permanent rmtree so
@@ -1672,7 +1672,7 @@ SKILL_MANAGE_SCHEMA = {
     "description": (
         "Manage skills (create, update, delete). Skills are your procedural "
         "memory — reusable approaches for recurring task types. "
-        f"New skills go to {display_hermes_home()}/skills/; existing skills can be modified wherever they live.\n\n"
+        f"New skills go to {display_artemis_home()}/skills/; existing skills can be modified wherever they live.\n\n"
         "Actions: create (full SKILL.md + optional category), "
         "patch (old_string/new_string — preferred for fixes), "
         "edit (full SKILL.md rewrite — major overhauls only), "

@@ -1,6 +1,6 @@
 """CLI entry point for the artemis-agent ACP adapter.
 
-Loads environment variables from ``~/.hermes/.env``, configures logging
+Loads environment variables from ``~/.artemis/.env``, configures logging
 to write to stderr (so stdout is reserved for ACP JSON-RPC transport),
 and starts the ACP agent server.
 
@@ -10,7 +10,7 @@ Usage::
     # or
     artemis acp
     # or
-    hermes-acp
+    artemis-acp
 """
 
 # IMPORTANT: artemis_bootstrap must be the very first import — UTF-8 stdio
@@ -25,7 +25,7 @@ except ModuleNotFoundError:
     pass
 else:
     # Stop a ``utils/``/``proxy/``/``ui/`` package in the launch directory from
-    # shadowing Hermes's own modules — ``artemis acp`` can be started from any
+    # shadowing Artemis's own modules — ``artemis acp`` can be started from any
     # cwd, including a project that has same-named packages on its path.
     artemis_bootstrap.harden_import_path()
 
@@ -102,7 +102,7 @@ def _setup_logging() -> None:
 
 
 def _load_env() -> None:
-    """Load .env from ARTEMIS_HOME (default ``~/.hermes``)."""
+    """Load .env from ARTEMIS_HOME (default ``~/.artemis``)."""
     from artemis_cli.env_loader import load_artemis_dotenv
 
     artemis_home = get_artemis_home()
@@ -118,10 +118,10 @@ def _load_env() -> None:
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        prog="hermes-acp",
-        description="Run Hermes Agent as an ACP stdio server.",
+        prog="artemis-acp",
+        description="Run Artemis Agent as an ACP stdio server.",
     )
-    parser.add_argument("--version", action="store_true", help="Print Hermes version and exit")
+    parser.add_argument("--version", action="store_true", help="Print Artemis version and exit")
     parser.add_argument(
         "--check",
         action="store_true",
@@ -130,12 +130,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--setup",
         action="store_true",
-        help="Run interactive Hermes provider/model setup for ACP terminal auth",
+        help="Run interactive Artemis provider/model setup for ACP terminal auth",
     )
     parser.add_argument(
         "--setup-browser",
         action="store_true",
-        help="Install agent-browser + Playwright Chromium into ~/.hermes/node/ "
+        help="Install agent-browser + Playwright Chromium into ~/.artemis/node/ "
              "for browser tool support. Idempotent.",
     )
     parser.add_argument(
@@ -150,25 +150,25 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def _print_version() -> None:
-    from artemis_cli import __version__ as hermes_version
+    from artemis_cli import __version__ as artemis_version
 
-    print(hermes_version)
+    print(artemis_version)
 
 
 def _run_check() -> None:
     import acp  # noqa: F401
-    from acp_adapter.server import HermesACPAgent  # noqa: F401
+    from acp_adapter.server import ArtemisACPAgent  # noqa: F401
 
-    print("Hermes ACP check OK")
+    print("Artemis ACP check OK")
 
 
 def _run_setup() -> None:
-    from artemis_cli.main import main as hermes_main
+    from artemis_cli.main import main as artemis_main
 
     old_argv = sys.argv[:]
     try:
-        sys.argv = [old_argv[0] if old_argv else "hermes", "model"]
-        hermes_main()
+        sys.argv = [old_argv[0] if old_argv else "artemis", "model"]
+        artemis_main()
     finally:
         sys.argv = old_argv
 
@@ -247,7 +247,7 @@ def main(argv: list[str] | None = None) -> None:
         sys.path.insert(0, project_root)
 
     import acp
-    from .server import HermesACPAgent
+    from .server import ArtemisACPAgent
 
     # MCP tool discovery from config.yaml — fire-and-forget in a
     # background daemon thread so the ACP server becomes responsive
@@ -268,7 +268,7 @@ def main(argv: list[str] | None = None) -> None:
         except Exception:
             logger.debug("MCP tool discovery failed at ACP startup", exc_info=True)
 
-    agent = HermesACPAgent()
+    agent = ArtemisACPAgent()
     try:
         asyncio.run(acp.run_agent(agent, use_unstable_protocol=True))
     except KeyboardInterrupt:

@@ -49,7 +49,7 @@ plane (design.md §2.8): a root-level blob in the tree at
 the manifest from local intent; pull reconciles local intent FROM it, so a skill
 opted in on one device becomes opted in on the others. The plane manifest is
 authoritative; the local flag is just the editable intent. Only agent-created +
-user-authored skills under ``~/.hermes/skills/`` are eligible; bundled and
+user-authored skills under ``~/.artemis/skills/`` are eligible; bundled and
 hub-installed skills are excluded.
 """
 
@@ -335,7 +335,7 @@ def resolve_sync_base_url() -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
-# Sync feature configuration — env-first, so a Hermes Cloud instance can be set
+# Sync feature configuration — env-first, so a Artemis Cloud instance can be set
 # up to use sync BY DEFAULT purely through environment variables (no per-user
 # config.yaml edit, no per-skill CLI call). Every knob follows the same
 # precedence as base_url: the ARTEMIS_SYNC_* env var wins, else config.yaml
@@ -392,7 +392,7 @@ def sync_feature_enabled() -> bool:
     """Whether the sync feature is turned on for this instance (env-first).
 
     ``ARTEMIS_SYNC_ENABLED`` -> ``sync.enabled`` -> False. This is the master
-    switch a Hermes Cloud deployment sets to opt its instances into sync by
+    switch a Artemis Cloud deployment sets to opt its instances into sync by
     default. It is checked by the gate-and-swallow entrypoints IN ADDITION to
     the Nous-admin token gate and a configured base URL — all three must hold for
     background sync to run.
@@ -428,7 +428,7 @@ def sync_default_opt_in() -> bool:
     ``artemis sync enable`` (or a plane manifest that opted it in). True: opt-OUT
     — every sync-eligible skill is treated as opted in unless explicitly
     disabled, which is the "your skills follow you with no setup" default a
-    Hermes Cloud deployment wants. Per the design notes, this default is
+    Artemis Cloud deployment wants. Per the design notes, this default is
     provisional and expected to flip; exposing it as env config lets the
     operator choose per deployment without a protocol change.
     """
@@ -438,7 +438,7 @@ def sync_default_opt_in() -> bool:
 # ---------------------------------------------------------------------------
 # Local skill eligibility + the personal sync opt-in "sync" flag
 #
-# Only agent-created + user-authored skills under ~/.hermes/skills/ sync.
+# Only agent-created + user-authored skills under ~/.artemis/skills/ sync.
 # Bundled (.bundled_manifest) and hub-installed skills are excluded. Sync is
 # opt-in: a skill only syncs when its usage-sidecar carries ``sync: true``.
 # ---------------------------------------------------------------------------
@@ -452,7 +452,7 @@ def _skills_dir() -> Path:
 def is_sync_eligible(skill_name: str) -> bool:
     """Whether *skill_name* is a candidate for sync (before the opt-in check).
 
-    Eligible = present locally under ~/.hermes/skills/, NOT bundled, NOT
+    Eligible = present locally under ~/.artemis/skills/, NOT bundled, NOT
     hub-installed, NOT an external-dir skill, and NOT under the org mirror
     (``_org/`` — enterprise-managed content pulls from the org HEAD and must
     never ride a personal push; the sync contract / the design notes). Mirrors the
@@ -486,7 +486,7 @@ def list_synced_skill_names() -> List[str]:
 
     - **opt-in (default):** a skill syncs only when its usage record carries
       ``sync: true`` AND it is eligible. Nothing syncs by default.
-    - **opt-out (Hermes Cloud "on by default"):** every *eligible* skill syncs
+    - **opt-out (Artemis Cloud "on by default"):** every *eligible* skill syncs
       UNLESS its usage record explicitly carries ``sync: false``. This is what a
       deployment sets (via ``ARTEMIS_SYNC_DEFAULT_OPT_IN``) so a user's skills
       follow them with no per-skill setup.
@@ -520,7 +520,7 @@ def list_synced_skill_names() -> List[str]:
 
 def _all_local_skill_names() -> List[str]:
     """Best-effort enumeration of every locally-present skill name (used by the
-    opt-out policy). A skill is any directory under ~/.hermes/skills/ containing
+    opt-out policy). A skill is any directory under ~/.artemis/skills/ containing
     a ``SKILL.md``; the name is its frontmatter ``name`` (falling back to the
     directory name). Eligibility (bundled/hub/external exclusion) is applied by
     the caller via ``is_sync_eligible``.
@@ -675,7 +675,7 @@ def _default_device_label() -> str:
 def stable_device_id() -> str:
     """Return a stable per-device label for commit ``author.device`` (contract
      -- advisory, never an auth input). Persisted under
-    ~/.hermes/skills/.sync_device_id.
+    ~/.artemis/skills/.sync_device_id.
 
     New devices are seeded with a HUMAN-FRIENDLY default (short hostname + a
     short random suffix, e.g. ``bens-macbook-a1b2c3``) so the sync console shows
@@ -692,7 +692,7 @@ def stable_device_id() -> str:
     except OSError:
         pass
 
-    # Hermes Cloud (and any templated deployment) can seed the label
+    # Artemis Cloud (and any templated deployment) can seed the label
     # declaratively via ARTEMIS_SYNC_DEVICE_NAME, so a hosted instance shows a
     # recognizable name with no CLI call. Env seeds the FIRST-USE value only; it
     # is then persisted, so a later `artemis sync device --name` (or editing the
@@ -713,7 +713,7 @@ def stable_device_id() -> str:
 def set_device_name(name: str) -> str:
     """Set the human-friendly device label used for commit ``author.device``.
 
-    Writes the (trimmed) name to ~/.hermes/skills/.sync_device_id, overwriting
+    Writes the (trimmed) name to ~/.artemis/skills/.sync_device_id, overwriting
     any previous value. The label is advisory metadata only — never an auth
     input (contract §2.4) — so any non-empty string is accepted. Returns the
     stored value. Raises ValueError on an empty name.
@@ -936,7 +936,7 @@ class SyncClient:
 # (skills_sync.py, truncated local content_hash namespace) AND from the
 # `sync-manifest` OBJECT in the sync plane (the per-skill opt-in content). This
 # is purely local reconciliation bookkeeping. Lives at
-# ~/.hermes/skills/.sync_state as JSON.
+# ~/.artemis/skills/.sync_state as JSON.
 #
 # NOTE: renamed from `.sync_manifest` -> `.sync_state` to remove the collision
 # with the  plane `sync-manifest`. `read_sync_state` migrates an existing
@@ -1053,13 +1053,13 @@ def materialize_tree(
 # Profile snapshot -- build the objects + per-skill tree map for a push
 #
 # The profile root is a tree whose entries mirror each synced skill's relative
-# path under ~/.hermes/skills/ (the sync contract: "the profile root is a tree
+# path under ~/.artemis/skills/ (the sync contract: "the profile root is a tree
 # whose entries are category trees"). Only opted-in, eligible skills are
 # included (personal sync opt-in + eligibility).
 # ---------------------------------------------------------------------------
 
 def _skill_rel_path(skill_name: str) -> Optional[PurePosixPath]:
-    """Return the skill's path relative to ~/.hermes/skills/ (posix), or None."""
+    """Return the skill's path relative to ~/.artemis/skills/ (posix), or None."""
     try:
         from tools.skill_usage import _find_skill_dir
     except Exception:
@@ -1246,8 +1246,8 @@ def _check_version(caps: Dict[str, Any]) -> None:
     major = ver.split(".", 1)[0]
     if major != WIRE_VERSION:
         raise SyncError(
-            f"this server speaks sync version {ver!r}, but this Hermes speaks "
-            f"{WIRE_VERSION} — update Hermes to sync with it"
+            f"this server speaks sync version {ver!r}, but this Artemis speaks "
+            f"{WIRE_VERSION} — update Artemis to sync with it"
         )
 
 
@@ -1515,7 +1515,7 @@ def pull_skills(
 
     Fetches ``refs/user/<owner>/HEAD``; if it advanced past our recorded head,
     walks the profile-root tree and writes each skill tree into
-    ~/.hermes/skills/. Only paths the user has opted into (``sync: true``) are
+    ~/.artemis/skills/. Only paths the user has opted into (``sync: true``) are
     materialized, so a pull never resurrects a skill the user hasn't chosen.
     Best-effort; returns a result dict.
     """
@@ -1722,7 +1722,7 @@ def list_org_skill_names() -> List[str]:
 # ---------------------------------------------------------------------------
 # Org-shared skills (sync contract) — org pull + propose.
 #
-# Org skills live under a DISTINCT local namespace, ~/.hermes/skills/_org/
+# Org skills live under a DISTINCT local namespace, ~/.artemis/skills/_org/
 # (the design notes: enterprise-managed skills are read-only to the runtime; a
 # local edit is a personal fork of record until proposed). The org canonical
 # set is `refs/org/<org_id>/HEAD` — the SAME object model as personal sync.
@@ -1807,7 +1807,7 @@ def pull_org_skills(
     *,
     identity: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Pull the org canonical set into ``~/.hermes/skills/_org/<org_id>/``.
+    """Pull the org canonical set into ``~/.artemis/skills/_org/<org_id>/``.
 
     Fast-forward only (design.md §2.6: no client merge on the org path): the
     mirror is replaced with the org HEAD's content. Local edits under _org/

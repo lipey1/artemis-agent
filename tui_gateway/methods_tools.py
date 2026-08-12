@@ -233,7 +233,7 @@ def _(rid, params: dict) -> dict:
 
 @method("reload.env")
 def _(rid, params: dict) -> dict:
-    """Re-read ``~/.hermes/.env`` into the gateway process via
+    """Re-read ``~/.artemis/.env`` into the gateway process via
     ``artemis_cli.config.reload_env``, matching classic CLI's ``/reload``
     handler.  Newly added API keys take effect on the next agent call
     without restarting the TUI.
@@ -1420,7 +1420,7 @@ def _(rid, params: dict) -> dict:
                 "title": "Environment",
                 "rows": [
                     ["Working Dir", os.getcwd()],
-                    ["Config File", str(_hermes_home / "config.yaml")],
+                    ["Config File", str(_artemis_home / "config.yaml")],
                 ],
             },
         ]
@@ -1849,7 +1849,7 @@ def _(rid, params: dict) -> dict:
                         "source": source,
                         "status": status,
                         # Agent Plugins v1 package (plugin.json — the portable
-                        # skills/MCP format) vs a native Hermes plugin.
+                        # skills/MCP format) vs a native Artemis plugin.
                         "portable": _is_portable_plugin_dir(_dir),
                     }
                 )

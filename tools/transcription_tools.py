@@ -360,10 +360,10 @@ def _try_lazy_install_stt() -> bool:
     except Exception as exc:
         logger.warning(
             "Lazy install of faster-whisper failed: %s. "
-            "This is often a permission issue: the Hermes process user cannot "
+            "This is often a permission issue: the Artemis process user cannot "
             "write to the virtual environment. Try running manually as the "
             "venv owner: `stat -c '%%u' '$(dirname $(dirname $(which python3)))'` "
-            "then `su - <owner> -c 'VIRTUAL_ENV=/opt/hermes/.venv "
+            "then `su - <owner> -c 'VIRTUAL_ENV=/opt/artemis/.venv "
             "uv pip install faster-whisper==1.2.1'`",
             exc,
         )
@@ -485,7 +485,7 @@ def _resolve_command_stt_provider_config(
 
 
 def _is_local_stt_provider(provider: str, stt_config: Dict[str, Any]) -> bool:
-    """Return whether *provider* is exempt from Hermes's remote upload cap."""
+    """Return whether *provider* is exempt from Artemis's remote upload cap."""
     key = (provider or "").lower().strip()
     if key in {"local", "local_command"}:
         return True
@@ -610,7 +610,7 @@ def _render_command_stt_template(
 
     def replace_match(match: "re.Match[str]") -> str:
         name = match.group("double") or match.group("single")
-        token = f"__HERMES_STT_PLACEHOLDER_{len(replacements)}__"
+        token = f"__ARTEMIS_STT_PLACEHOLDER_{len(replacements)}__"
         replacements.append((
             token,
             _quote_command_stt_placeholder(
@@ -696,7 +696,7 @@ def _command_stt_env_passthrough(config: Dict[str, Any]) -> list:
     """Return the provider's ``env_passthrough`` allowlist (opt-out of scrub).
 
     Command providers legitimately reference their own API keys in the shell
-    template (curl one-liners). The child env is scrubbed of Hermes secrets by
+    template (curl one-liners). The child env is scrubbed of Artemis secrets by
     default; ``env_passthrough: [MY_API_KEY, ...]`` copies the named variables
     back from the parent environment so a trusted template keeps working.
     Mirrors ``tools.tts_tool._command_provider_env_passthrough``.
@@ -718,7 +718,7 @@ def _run_command_stt(
     timeout, reset whenever the command emits output on stdout/stderr —
     a slow-but-alive provider survives, a silently stalled one is killed
     (same progress-based stuck detection as the TTS runner, #50081).
-    Child env is scrubbed of Hermes secrets (salvage of #56332) while still
+    Child env is scrubbed of Artemis secrets (salvage of #56332) while still
     propagating delegated-child lineage markers when applicable.
     """
     from agent.delegation_context import delegated_child_subprocess_env
@@ -924,7 +924,7 @@ def _transcribe_command_stt(
     model = model_override or config.get("model") or ""
 
     try:
-        with tempfile.TemporaryDirectory(prefix=f"hermes-cmd-stt-{provider_name}-") as tmpdir:
+        with tempfile.TemporaryDirectory(prefix=f"artemis-cmd-stt-{provider_name}-") as tmpdir:
             output_path = Path(tmpdir) / f"transcript.{output_format}"
             placeholders = {
                 "input_path": str(audio.resolve()),
@@ -1393,7 +1393,7 @@ def _prepare_audio_for_transcription(
                 "error": "Unsupported format: .silk. Install the optional 'pilk' dependency to enable WeChat voice transcription.",
             }
 
-    temp_dir = tempfile.mkdtemp(prefix="hermes-silk-")
+    temp_dir = tempfile.mkdtemp(prefix="artemis-silk-")
     converted_path = os.path.join(temp_dir, f"{audio_path.stem}.wav")
     try:
         import pilk
@@ -1559,7 +1559,7 @@ def _start_idle_unload_watcher(timeout_seconds: int) -> None:
 
         _idle_unload_stop.clear()
         _idle_unload_thread = threading.Thread(
-            target=_watch, name="hermes-stt-idle-unload", daemon=True
+            target=_watch, name="artemis-stt-idle-unload", daemon=True
         )
         _idle_unload_thread.start()
 
@@ -1896,7 +1896,7 @@ def _transcribe_local_command(file_path: str, model_name: str) -> Dict[str, Any]
     normalized_model = _normalize_local_command_model(model_name)
 
     try:
-        with tempfile.TemporaryDirectory(prefix="hermes-local-stt-") as output_dir:
+        with tempfile.TemporaryDirectory(prefix="artemis-local-stt-") as output_dir:
             prepared_input, prep_error = _prepare_local_audio(file_path, output_dir)
             if prep_error:
                 return {"success": False, "transcript": "", "error": prep_error}
@@ -1907,7 +1907,7 @@ def _transcribe_local_command(file_path: str, model_name: str) -> Dict[str, Any]
                 language=shlex.quote(language),
                 model=shlex.quote(normalized_model),
             )
-            # Scrub Hermes secrets from the child env (sibling path to #56332 /
+            # Scrub Artemis secrets from the child env (sibling path to #56332 /
             # _run_command_stt — this local-whisper path previously inherited
             # the full process environment).
             from tools.environments.local import artemis_subprocess_env
@@ -2093,7 +2093,7 @@ def _transcribe_openai(
                 return client.audio.transcriptions.create(**create_kwargs)
 
         try:
-            with tempfile.TemporaryDirectory(prefix="hermes-stt-") as work_dir:
+            with tempfile.TemporaryDirectory(prefix="artemis-stt-") as work_dir:
                 try:
                     transcription = _create_transcription(file_path)
                 except BadRequestError as exc:
@@ -2248,7 +2248,7 @@ def _transcribe_xai(file_path: str, model_name: str) -> Dict[str, Any]:
 
     try:
         import requests
-        from tools.xai_http import hermes_xai_user_agent
+        from tools.xai_http import artemis_xai_user_agent
 
         data: Dict[str, str] = {}
         if language:
@@ -2264,7 +2264,7 @@ def _transcribe_xai(file_path: str, model_name: str) -> Dict[str, Any]:
                     f"{endpoint_base_url}/stt",
                     headers={
                         "Authorization": f"Bearer {bearer}",
-                        "User-Agent": hermes_xai_user_agent(),
+                        "User-Agent": artemis_xai_user_agent(),
                     },
                     files={
                         "file": (Path(file_path).name, audio_file),
@@ -2611,7 +2611,7 @@ def _trim_silence_for_cloud_stt(
         f"start_periods=1:start_threshold={threshold_db}dB:start_silence={keep_seconds}:"
         f"stop_periods=-1:stop_threshold={threshold_db}dB:stop_silence={keep_seconds}"
     )
-    work_dir = tempfile.mkdtemp(prefix="hermes-stt-trim-")
+    work_dir = tempfile.mkdtemp(prefix="artemis-stt-trim-")
     trimmed_path = os.path.join(work_dir, f"{Path(file_path).stem or 'audio'}-trimmed.m4a")
     # Scale the all-silence guard with keep_ms: an output consisting solely
     # of kept pause must never be uploaded as "speech".

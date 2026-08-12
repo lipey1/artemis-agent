@@ -201,7 +201,7 @@ def _computer_use_cfg() -> Dict[str, Any]:
 
 
 def _cua_no_overlay() -> bool:
-    """True when Hermes should pass ``--no-overlay`` to cua-driver.
+    """True when Artemis should pass ``--no-overlay`` to cua-driver.
 
     Reads ``computer_use.no_overlay``. Default ``None`` (auto-detect):
     disable the overlay where idle CPU burn is a known failure mode —
@@ -231,7 +231,7 @@ def _cua_no_overlay() -> bool:
 
 
 def _cua_telemetry_disabled() -> bool:
-    """True when Hermes should disable cua-driver telemetry for this user.
+    """True when Artemis should disable cua-driver telemetry for this user.
 
     Reads ``computer_use.cua_telemetry`` (default False → telemetry off).
     Unreadable config falls SAFE toward disabling telemetry.
@@ -357,10 +357,10 @@ def _select_capture_target(
 
 
 def _wsl_windows_path_to_posix(path: str) -> str:
-    """Translate a Windows absolute manifest command when Hermes runs in WSL.
+    """Translate a Windows absolute manifest command when Artemis runs in WSL.
 
     Windows cua-driver manifests can report ``C:\\Users\\...\\cua-driver.exe``
-    even though the Hermes process uses POSIX subprocess spawning inside WSL.
+    even though the Artemis process uses POSIX subprocess spawning inside WSL.
     The same file is reachable through DrvFS as ``/mnt/c/Users/...``.
     Non-Windows paths and non-WSL hosts are returned unchanged.
     """
@@ -384,7 +384,7 @@ class _EmbeddedCuaDaemon:
     """Private host-owned daemon used for an explicit unrestricted session.
 
     Cua Driver permission mode is immutable after daemon startup.  Reusing the
-    machine-wide daemon would therefore let one Hermes session's YOLO choice
+    machine-wide daemon would therefore let one Artemis session's YOLO choice
     affect another session.  A private embedded daemon gives the requesting
     session its own socket, process, and launch-time risk acknowledgement.
     """
@@ -403,7 +403,7 @@ class _EmbeddedCuaDaemon:
         self._stderr_thread: Optional[threading.Thread] = None
         token = uuid.uuid4().hex[:12]
         if sys.platform == "win32":
-            self.socket_path = rf"\\.\pipe\hermes-cua-{token}"
+            self.socket_path = rf"\\.\pipe\artemis-cua-{token}"
         else:
             self.socket_path = os.path.join(
                 tempfile.gettempdir(), f"hc-{token}.sock"
@@ -461,7 +461,7 @@ class _EmbeddedCuaDaemon:
         self._stderr_thread = threading.Thread(
             target=self._drain_stderr,
             args=(self._process,),
-            name="hermes-cua-daemon-stderr",
+            name="artemis-cua-daemon-stderr",
             daemon=True,
         )
         self._stderr_thread.start()
@@ -547,7 +547,7 @@ def _resolve_mcp_invocation(
     (trycua/cua#1961). The manifest carries a stable ``mcp_invocation``
     pointer with both ``command`` and ``args``, so a future cua-driver
     that renames or relocates the subcommand keeps working without a
-    Hermes patch.
+    Artemis patch.
 
     Falls back to ``(driver_cmd, ["mcp"])`` for older drivers that don't
     expose ``manifest``, or any indeterminate failure — the wrapper must
@@ -594,7 +594,7 @@ def _resolve_mcp_invocation(
         # The driver knows the subcommand but didn't surface its own path.
         # Keep our resolved driver_cmd; the args are still authoritative.
         return driver_cmd, _mcp_args_with_overlay_flag(args, driver_cmd=driver_cmd)
-    # A Windows-installed cua-driver can hand a WSL-hosted Hermes an absolute
+    # A Windows-installed cua-driver can hand a WSL-hosted Artemis an absolute
     # ``C:\...`` command; translate it to its DrvFS ``/mnt/<drive>/...`` form
     # BEFORE the path-separator check (backslash is not a separator on POSIX,
     # so the raw Windows string would otherwise be discarded here).
@@ -699,7 +699,7 @@ def _candidate_cua_driver_commands(override: Optional[str] = None) -> List[str]:
     Desktop apps launched from Finder/Dock often inherit a narrow PATH that
     omits user-local install directories. The upstream cua-driver installer
     commonly places the binary under ``~/.local/bin`` on POSIX systems, so a
-    Hermes Desktop/TUI session can otherwise filter out the `computer_use`
+    Artemis Desktop/TUI session can otherwise filter out the `computer_use`
     tool even though `artemis computer-use doctor` succeeds from a login shell.
     """
     configured = (override if override is not None else os.environ.get(_CUA_DRIVER_CMD_ENV, "")).strip()
@@ -1163,7 +1163,7 @@ class _CuaDriverSession:
                 command=command,
                 args=args,
                 # Apply the telemetry policy first (default: disabled), then
-                # sanitize Hermes-managed secrets out of the child env.
+                # sanitize Artemis-managed secrets out of the child env.
                 env=_sanitize_subprocess_env(child_env),
             )
 
@@ -1292,12 +1292,12 @@ class _CuaDriverSession:
             # passes but the wrapper times out" reports are undiagnosable
             # from a bare "never reached ready".
             phase = getattr(self, "_startup_phase", "unknown")
-            from artemis_constants import display_hermes_home
+            from artemis_constants import display_artemis_home
             raise RuntimeError(
                 "cua-driver session never reached ready (timeout 30s; "
                 f"stuck in phase: {phase}). "
                 "Run `artemis computer-use doctor` and check "
-                f"{display_hermes_home()}/logs/agent.log for the phase timings."
+                f"{display_artemis_home()}/logs/agent.log for the phase timings."
             )
         # If setup failed, the lifecycle coroutine set _setup_error
         # before setting _ready_event. Re-raise it on the caller's thread.
@@ -1937,20 +1937,20 @@ class CuaDriverBackend(ComputerUseBackend):
         # instructions ask every consumer to declare a stable session
         # at the start of a run (start_session) and tear it down at
         # the end (end_session). Doing so:
-        #   - Gets a distinct agent-cursor color per Hermes run, with
+        #   - Gets a distinct agent-cursor color per Artemis run, with
         #     overlay rendering visualising where actions land
         #     (without moving the real OS cursor).
         #   - Isolates per-session config + recording ownership so
-        #     concurrent Hermes runs / subagents don't step on each
+        #     concurrent Artemis runs / subagents don't step on each
         #     other.
         # We mint a UUID4-based id once per CuaDriverBackend instance —
-        # one Hermes run = one backend = one session — and pass it as
+        # one Artemis run = one backend = one session — and pass it as
         # `session` on every cua-driver tool call. Sessions are an
         # additive feature on the cua-driver side: when our id is
         # unknown to the driver (older builds), the tool calls
         # degrade to the anonymous / unsynced path documented in the
         # MCP server instructions.
-        self._session_id: str = f"hermes-{uuid.uuid4().hex[:12]}"
+        self._session_id: str = f"artemis-{uuid.uuid4().hex[:12]}"
         self._typed_browser = CuaTypedBrowserRoute(
             session_id=self._session_id,
             call_tool=self._session.call_tool,
@@ -1973,7 +1973,7 @@ class CuaDriverBackend(ComputerUseBackend):
     def start(self) -> None:
         _maybe_nudge_update()
         # The MCP client SDK (`mcp`) is an optional dependency (the
-        # `computer-use` / `mcp` extras), not part of Hermes' minimal core.
+        # `computer-use` / `mcp` extras), not part of Artemis' minimal core.
         # Lazy-install it on first use — the same pattern every other optional
         # backend uses — so users never hit an opaque `No module named 'mcp'`
         # at invoke time. Auto-install is gated by `security.allow_lazy_installs`
@@ -2879,7 +2879,7 @@ class CuaDriverBackend(ComputerUseBackend):
         process.
 
         The default remains non-disruptive. ``raise_window=True`` is explicit,
-        separately approved by the Hermes adapter, and uses cua-driver's
+        separately approved by the Artemis adapter, and uses cua-driver's
         standalone ``bring_to_front`` tool rather than an action property.
         """
         try:

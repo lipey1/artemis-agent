@@ -670,7 +670,7 @@ class PlatformConfig:
     # assistant.threads.setStatus line (shown next to the bot name; needs the
     # assistant:write scope to render) and Google Chat's visible marker
     # message. None keeps each platform's built-in default ("is thinking..." /
-    # "Hermes is thinking…"). Platforms with textless indicators (Discord,
+    # "Artemis is thinking…"). Platforms with textless indicators (Discord,
     # Telegram, Matrix, …) ignore it.
     typing_status_text: Optional[str] = None
 
@@ -1312,8 +1312,8 @@ def load_gateway_config() -> GatewayConfig:
 
     Priority (highest to lowest):
     1. Environment variables
-    2. ~/.hermes/config.yaml (primary user-facing config)
-    3. ~/.hermes/gateway.json (legacy — provides defaults under config.yaml)
+    2. ~/.artemis/config.yaml (primary user-facing config)
+    3. ~/.artemis/gateway.json (legacy — provides defaults under config.yaml)
     4. Built-in defaults
     """
     _home = get_artemis_home()

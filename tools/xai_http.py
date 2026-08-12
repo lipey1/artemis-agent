@@ -26,7 +26,7 @@ def has_xai_credentials() -> bool:
     Resolution order, fast-to-slow:
 
     1. ``XAI_API_KEY`` env var (cheapest; covers explicit-key users).
-    2. ``~/.hermes/auth.json`` has a non-empty ``providers.xai-oauth.tokens.access_token``
+    2. ``~/.artemis/auth.json`` has a non-empty ``providers.xai-oauth.tokens.access_token``
        (single file read, no expiry check, no refresh).
     3. ``credential_pool.xai-oauth`` has any entry with a non-empty
        ``access_token`` (covers multi-account ``artemis auth add xai-oauth``
@@ -77,42 +77,42 @@ def has_xai_credentials() -> bool:
 
 
 def get_env_value(name: str, default=None):
-    """Read ``name`` from ``~/.hermes/.env`` first, then ``os.environ``.
+    """Read ``name`` from ``~/.artemis/.env`` first, then ``os.environ``.
 
     Wraps :func:`artemis_cli.config.get_env_value` so tests can patch
     ``tools.xai_http.get_env_value`` to inject dotenv-only secrets into the
     xAI credential resolver.
     """
     try:
-        from artemis_cli.config import get_env_value as _hermes_get_env_value
+        from artemis_cli.config import get_env_value as _artemis_get_env_value
     except ImportError:
         return os.environ.get(name, default)
 
-    value = _hermes_get_env_value(name)
+    value = _artemis_get_env_value(name)
     return value if value is not None else default
 
 
-def hermes_xai_user_agent() -> str:
-    """Return a stable Hermes-specific User-Agent for xAI HTTP calls."""
+def artemis_xai_user_agent() -> str:
+    """Return a stable Artemis-specific User-Agent for xAI HTTP calls."""
     try:
         from artemis_cli import __version__
     except Exception:
         __version__ = "unknown"
-    return f"Hermes-Agent/{__version__}"
+    return f"Artemis-Agent/{__version__}"
 
 
-def hermes_xai_default_headers() -> Dict[str, str]:
+def artemis_xai_default_headers() -> Dict[str, str]:
     """Default headers for OpenAI-SDK and raw HTTP clients talking to xAI.
 
     Replaces the OpenAI Python SDK's identifying ``User-Agent: OpenAI/Python …``
-    so chat/completions and Responses traffic is attributed as Hermes Agent,
+    so chat/completions and Responses traffic is attributed as Artemis Agent,
     matching the direct HTTP integrations (search, TTS, STT, image, video).
     """
-    return {"User-Agent": hermes_xai_user_agent()}
+    return {"User-Agent": artemis_xai_user_agent()}
 
 
 def _load_config_section(section_name: str) -> Dict[str, Any]:
-    """Return a top-level Hermes config section as a dict, or empty."""
+    """Return a top-level Artemis config section as a dict, or empty."""
     try:
         from artemis_cli.config import load_config
 
@@ -236,7 +236,7 @@ def xai_storage_notice_text(section_name: str) -> str:
 
 
 def maybe_mark_xai_storage_notice_seen(section_name: str) -> Optional[str]:
-    """Return the storage notice once per Hermes home, then mark it seen."""
+    """Return the storage notice once per Artemis home, then mark it seen."""
     notice = xai_storage_notice_text(section_name)
     if not notice:
         return None
@@ -261,9 +261,9 @@ def resolve_xai_http_credentials(
 ) -> Dict[str, str]:
     """Resolve bearer credentials for direct xAI HTTP endpoints.
 
-    Prefers Hermes-managed xAI OAuth credentials when available, then falls back
+    Prefers Artemis-managed xAI OAuth credentials when available, then falls back
     to ``XAI_API_KEY`` resolved via ``artemis_cli.config.get_env_value`` so keys
-    stored in ``~/.hermes/.env`` (the standard Hermes location) are honored —
+    stored in ``~/.artemis/.env`` (the standard Artemis location) are honored —
     not just ones already exported into ``os.environ``. This keeps direct xAI
     endpoints (images, TTS, STT, etc.) aligned with the main runtime auth model
     and preserves the regression contract from PR #17140 / #17163.

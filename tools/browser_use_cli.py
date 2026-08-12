@@ -190,7 +190,7 @@ def default_downgrade_notice() -> Optional[str]:
 
 
 def _managed_bin_dir() -> Optional[str]:
-    """Hermes' own bin dir ($ARTEMIS_HOME/bin) — where install.sh puts uv/uvx
+    """Artemis' own bin dir ($ARTEMIS_HOME/bin) — where install.sh puts uv/uvx
     and where install_cli() links the browser-use binary."""
     try:
         from artemis_constants import get_artemis_home
@@ -204,9 +204,9 @@ def _managed_bin_dir() -> Optional[str]:
 def _find_cli() -> Optional[List[str]]:
     """Locate the browser-use CLI, or None when it can't be run.
 
-    Prefers an installed browser-use binary (PATH, then Hermes' managed
+    Prefers an installed browser-use binary (PATH, then Artemis' managed
     $ARTEMIS_HOME/bin); falls back to running it through uvx (PATH, then
-    managed). The managed probes matter because Hermes bootstraps its own
+    managed). The managed probes matter because Artemis bootstraps its own
     uv into $ARTEMIS_HOME/bin, which is not on the user's PATH.
     """
     bin_dir = _managed_bin_dir()
@@ -226,7 +226,7 @@ def _find_cli() -> Optional[List[str]]:
 def install_cli(timeout_s: int = 600) -> Tuple[bool, str]:
     """Install the browser-use CLI persistently via ``uv tool install``.
 
-    Resolution order for uv: Hermes' managed uv (bootstrapped on demand via
+    Resolution order for uv: Artemis' managed uv (bootstrapped on demand via
     ``artemis_cli.managed_uv.ensure_uv``) → uv on PATH. The binary is linked
     into ``$ARTEMIS_HOME/bin`` (``UV_TOOL_BIN_DIR``) so ``_find_cli()``
     resolves it for every profile without touching the user's PATH.

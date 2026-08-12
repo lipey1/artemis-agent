@@ -150,7 +150,7 @@ function FilesystemTab({
     <div className="flex min-h-0 flex-1 flex-col">
       <RightSidebarSectionHeader>
         <div className="flex min-w-0 flex-1">
-          <SidebarPanelLabel>{cwdName}</SidebarPanelLabel>
+          <SidebarPanelLabel icon={<Codicon name="folder" size="0.75rem" />}>{cwdName}</SidebarPanelLabel>
         </div>
         <Tip label={r.refreshTree}>
           <Button
@@ -197,7 +197,10 @@ function FilesystemTab({
 
 export function RightSidebarSectionHeader({ children, className, ...props }: ComponentProps<'div'>) {
   return (
-    <div className={cn('group/project-header flex h-7 shrink-0 items-center px-2.5', className)} {...props}>
+    <div
+      className={cn('group/project-header flex h-8 shrink-0 items-center px-2.5 pt-1', className)}
+      {...props}
+    >
       {children}
     </div>
   )

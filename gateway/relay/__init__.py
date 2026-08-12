@@ -1,4 +1,4 @@
-"""Relay/connector support package for the Hermes gateway.
+"""Relay/connector support package for the Artemis gateway.
 
 EXPERIMENTAL. This package implements the gateway side of the "Gateway Gateway"
 relay design: a generic ``RelayAdapter`` plus the wire-serializable
@@ -138,7 +138,7 @@ def relay_connection_auth() -> tuple[Optional[str], Optional[str]]:
     """The (gateway_id, upgrade_secret) this gateway authenticates the WS upgrade with.
 
     Both come from enrollment (``artemis gateway enroll`` writes them to
-    ``~/.hermes/.env``): ``GATEWAY_RELAY_ID`` identifies the enrolled instance,
+    ``~/.artemis/.env``): ``GATEWAY_RELAY_ID`` identifies the enrolled instance,
     ``GATEWAY_RELAY_SECRET`` is the per-gateway signing secret. Either absent ->
     ``(None, None)`` and the transport dials unauthenticated (dev/test, or a
     connector that doesn't enforce auth). Checks env first (Docker), then
@@ -296,10 +296,10 @@ def relay_display_name() -> Optional[str]:
         except Exception:  # noqa: BLE001 - branding absence must never crash boot
             value = ""
         # The stock brand name is IDENTICAL on every default install, so in a
-        # multi-agent scope it would prefix every reply "**Hermes Agent:**" —
+        # multi-agent scope it would prefix every reply "**Artemis Agent:**" —
         # shadowing the connector's linked-owner fallback, which actually
         # disambiguates. Only a deliberately customized name is forwarded.
-        if value == "Hermes Agent":
+        if value == "Artemis Agent":
             value = ""
     # Mirror the connector's ingest sanitization (trim + 64-char cap) so what
     # we send is what gets stored.
@@ -632,7 +632,7 @@ def self_provision_relay() -> bool:
     POSTs ``/relay/provision`` asserting its own endpoint + route keys, and sets
     ``GATEWAY_RELAY_ID`` / ``GATEWAY_RELAY_SECRET`` / ``GATEWAY_RELAY_DELIVERY_KEY``
     into ``os.environ`` so the subsequent ``register_relay_adapter()`` picks them
-    up. The creds live ONLY in process memory — never written to ``~/.hermes/.env``.
+    up. The creds live ONLY in process memory — never written to ``~/.artemis/.env``.
 
     The trigger is deliberately NOT ``is_managed()``: that means
     "package-manager/NixOS-managed" and is False on a NAS-hosted Fly agent (which
@@ -690,7 +690,7 @@ def self_provision_relay() -> bool:
         host = socket.gethostname().strip()
     except Exception:  # noqa: BLE001
         host = ""
-    gateway_id = os.environ.get("GATEWAY_RELAY_ID", "").strip() or f"gw-{host or 'hermes'}"
+    gateway_id = os.environ.get("GATEWAY_RELAY_ID", "").strip() or f"gw-{host or 'artemis'}"
     endpoint = relay_endpoint()
     route_keys = relay_route_keys()
     instance_id = relay_instance_id()

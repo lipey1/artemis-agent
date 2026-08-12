@@ -2,19 +2,19 @@
 """
 Code Execution Tool -- Programmatic Tool Calling (PTC)
 
-Lets the LLM write a Python script that calls Hermes tools via RPC,
+Lets the LLM write a Python script that calls Artemis tools via RPC,
 collapsing multi-step tool chains into a single inference turn.
 
 Architecture (two transports):
 
   **Local backend (UDS):**
-  1. Parent generates a `hermes_tools.py` stub module with UDS RPC functions
+  1. Parent generates a `artemis_tools.py` stub module with UDS RPC functions
   2. Parent opens a Unix domain socket and starts an RPC listener thread
   3. Parent spawns a child process that runs the LLM's script
   4. Tool calls travel over the UDS back to the parent for dispatch
 
   **Remote backends (file-based RPC):**
-  1. Parent generates `hermes_tools.py` with file-based RPC stubs
+  1. Parent generates `artemis_tools.py` with file-based RPC stubs
   2. Parent ships both files to the remote environment
   3. Script runs inside the terminal backend (Docker/SSH/Modal/Daytona/etc.)
   4. Tool calls are written as request files; a polling thread on the parent
@@ -53,7 +53,7 @@ from agent.thread_scoped_output import thread_scoped_silence
 # Availability gate.  On Windows we fall back to loopback TCP for the
 # sandbox RPC transport (AF_UNIX is unreliable on Windows Python) — see
 # ``_use_tcp_rpc`` in ``_execute_local`` below.  That makes execute_code
-# available on every platform Hermes itself runs on.
+# available on every platform Artemis itself runs on.
 logger = logging.getLogger(__name__)
 
 SANDBOX_AVAILABLE = True
@@ -135,16 +135,16 @@ def _truncate_stdout_text(stdout_text: str) -> Tuple[str, Dict[str, Any]]:
 
 # Environment variable scrubbing rules (shared between the local + remote
 # backends).  Secret-substring block is applied first; anything left must
-# match a safe prefix, the operational HERMES_ allowlist, or (on Windows) an
+# match a safe prefix, the operational ARTEMIS_ allowlist, or (on Windows) an
 # OS-essential name.  Delegate-task child context is also an exact-name
-# operational marker: without it, a sandbox script that spawns/imports Hermes
+# operational marker: without it, a sandbox script that spawns/imports Artemis
 # code can lose the DB-layer Kanban mutation guard while still inheriting
 # ARTEMIS_HOME.
 #
-# NB: the broad "HERMES_" prefix was deliberately removed (#27303) — it leaked
-# HERMES_*-named config that lacks a secret substring (e.g. ARTEMIS_BASE_URL,
-# ARTEMIS_KANBAN_DB, HERMES_*_WEBHOOK).  The child only needs the few
-# location/profile vars in _HERMES_CHILD_ALLOWED below; ARTEMIS_RPC_SOCKET /
+# NB: the broad "ARTEMIS_" prefix was deliberately removed (#27303) — it leaked
+# ARTEMIS_*-named config that lacks a secret substring (e.g. ARTEMIS_BASE_URL,
+# ARTEMIS_KANBAN_DB, ARTEMIS_*_WEBHOOK).  The child only needs the few
+# location/profile vars in _ARTEMIS_CHILD_ALLOWED below; ARTEMIS_RPC_SOCKET /
 # ARTEMIS_RPC_DIR / TZ / HOME are injected explicitly after scrubbing.
 _SAFE_ENV_PREFIXES = ("PATH", "HOME", "USER", "LANG", "LC_", "TERM",
                       "TMPDIR", "TMP", "TEMP", "SHELL", "LOGNAME",
@@ -161,11 +161,11 @@ _SECRET_SUBSTRINGS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL",
                       # PASSWORD/PASSWD already cover the credential cases.
                       "CREDS", "BEARER", "APIKEY")
 
-# Operational HERMES_* vars the child legitimately needs by exact name — these
+# Operational ARTEMIS_* vars the child legitimately needs by exact name — these
 # are non-secret runtime-location flags (the same set artemis_cli treats as the
 # runtime location) that repo-root modules a sandbox script imports may read at
 # import time.  None match _SECRET_SUBSTRINGS.
-_HERMES_CHILD_ALLOWED = frozenset({
+_ARTEMIS_CHILD_ALLOWED = frozenset({
     "ARTEMIS_HOME",
     "ARTEMIS_PROFILE",
     "ARTEMIS_CONFIG",
@@ -214,7 +214,7 @@ def _scrub_child_env(source_env, is_passthrough=None, is_windows=None):
          unscoped multiplex read fails closed.
       2. Secret-substring names (KEY/TOKEN/DSN/WEBHOOK/etc.) are blocked.
       3. Names matching a safe prefix pass.
-      4. Operational HERMES_* vars (_HERMES_CHILD_ALLOWED) pass by exact name.
+      4. Operational ARTEMIS_* vars (_ARTEMIS_CHILD_ALLOWED) pass by exact name.
       5. On Windows, a small OS-essential allowlist passes by exact name
          — without these the child can't even create a socket or spawn a
          subprocess.
@@ -242,8 +242,8 @@ def _scrub_child_env(source_env, is_passthrough=None, is_windows=None):
         is_windows = _IS_WINDOWS
 
     scrubbed = {}
-    # Non-secret HERMES_* vars dropped by the tightened allowlist (#27303). The
-    # broad "HERMES_" prefix used to pass these through; now only the
+    # Non-secret ARTEMIS_* vars dropped by the tightened allowlist (#27303). The
+    # broad "ARTEMIS_" prefix used to pass these through; now only the
     # operational set does. The drop is intentional (those vars can carry
     # config like ARTEMIS_KANBAN_DB / ARTEMIS_BASE_URL), but a sandbox script
     # that imports a repo module reading one at import time would otherwise see
@@ -261,24 +261,24 @@ def _scrub_child_env(source_env, is_passthrough=None, is_windows=None):
         if any(k.startswith(p) for p in _SAFE_ENV_PREFIXES):
             scrubbed[k] = v
             continue
-        if k in _HERMES_CHILD_ALLOWED:
+        if k in _ARTEMIS_CHILD_ALLOWED:
             scrubbed[k] = v
             continue
         if is_windows and k.upper() in _WINDOWS_ESSENTIAL_ENV_VARS:
             scrubbed[k] = v
             continue
-        if k.startswith("HERMES_"):
+        if k.startswith("ARTEMIS_"):
             # Non-secret (secrets were already dropped above) and not in any
-            # allowlist — a deliberately-dropped HERMES_* var.
-            _dropped_hermes.append(k)
-    if _dropped_hermes:
+            # allowlist — a deliberately-dropped ARTEMIS_* var.
+            _dropped_artemis.append(k)
+    if _dropped_artemis:
         logger.debug(
-            "execute_code: dropped %d non-allowlisted HERMES_* var(s) from the "
+            "execute_code: dropped %d non-allowlisted ARTEMIS_* var(s) from the "
             "sandbox child env (%s). This is intentional hardening (#27303); if "
             "a sandbox script legitimately needs one, declare it via "
             "env_passthrough in the skill/config so it passes by explicit opt-in.",
-            len(_dropped_hermes),
-            ", ".join(sorted(_dropped_hermes)),
+            len(_dropped_artemis),
+            ", ".join(sorted(_dropped_artemis)),
         )
 
     # delegate_task children are marked with a ContextVar, not os.environ, while
@@ -322,7 +322,7 @@ def check_sandbox_requirements() -> bool:
 
 
 # ---------------------------------------------------------------------------
-# hermes_tools.py code generator
+# artemis_tools.py code generator
 # ---------------------------------------------------------------------------
 
 # Per-tool stub templates: (function_name, signature, docstring, args_dict_expr)
@@ -349,7 +349,7 @@ _TOOL_STUBS = {
     "write_file": (
         "write_file",
         "path: str, content: str, cross_profile: bool = False",
-        '"""Write content to a file (always overwrites). Returns dict with status. cross_profile=True opts out of the cross-Hermes-profile soft guard."""',
+        '"""Write content to a file (always overwrites). Returns dict with status. cross_profile=True opts out of the cross-Artemis-profile soft guard."""',
         '{"path": path, "content": content, "cross_profile": cross_profile}',
     ),
     "search_files": (
@@ -361,7 +361,7 @@ _TOOL_STUBS = {
     "patch": (
         "patch",
         'path: str = None, old_string: str = None, new_string: str = None, replace_all: bool = False, mode: str = "replace", patch: str = None, cross_profile: bool = False',
-        '"""Targeted find-and-replace (mode="replace") or V4A multi-file patches (mode="patch"). Returns dict with status. cross_profile=True opts out of the cross-Hermes-profile soft guard."""',
+        '"""Targeted find-and-replace (mode="replace") or V4A multi-file patches (mode="patch"). Returns dict with status. cross_profile=True opts out of the cross-Artemis-profile soft guard."""',
         '{"path": path, "old_string": old_string, "new_string": new_string, "replace_all": replace_all, "mode": mode, "patch": patch, "cross_profile": cross_profile}',
     ),
     "terminal": (
@@ -377,7 +377,7 @@ def _sandbox_failure_hint(stderr_text: str, enabled_tools=None) -> Optional[str]
     """Map well-known sandbox script failures to one actionable recovery hint.
 
     Production mining (state.db): the top execute_code failure classes are
-    hermes_tools import misuse (importing tools that aren't in the sandbox,
+    artemis_tools import misuse (importing tools that aren't in the sandbox,
     23x in one window), calling the built-in helpers via import, treating
     tool results as strings instead of dicts, and importing third-party
     packages that don't exist in the sandbox interpreter. Bounded scan,
@@ -388,7 +388,7 @@ def _sandbox_failure_hint(stderr_text: str, enabled_tools=None) -> Optional[str]
     window = stderr_text[:4000]
     try:
         m = re.search(
-            r"cannot import name '(\w+)' from 'hermes_tools'", window
+            r"cannot import name '(\w+)' from 'artemis_tools'", window
         )
         if m:
             missing = m.group(1)
@@ -428,10 +428,10 @@ def _sandbox_failure_hint(stderr_text: str, enabled_tools=None) -> Optional[str]
     return None
 
 
-def generate_hermes_tools_module(enabled_tools: List[str],
+def generate_artemis_tools_module(enabled_tools: List[str],
                                  transport: str = "uds") -> str:
     """
-    Build the source code for the hermes_tools.py stub module.
+    Build the source code for the artemis_tools.py stub module.
 
     Only tools in both SANDBOX_ALLOWED_TOOLS and enabled_tools get stubs.
 
@@ -509,7 +509,7 @@ def retry(fn, max_attempts=3, delay=2):
 # ---- UDS transport (local backend) ---------------------------------------
 
 _UDS_TRANSPORT_HEADER = '''\
-"""Auto-generated Hermes tools RPC stubs."""
+"""Auto-generated Artemis tools RPC stubs."""
 import json, os, socket, shlex, threading, time
 
 _sock = None
@@ -577,10 +577,10 @@ def _call(tool_name, args):
 # ---- File-based transport (remote backends) -------------------------------
 
 _FILE_TRANSPORT_HEADER = '''\
-"""Auto-generated Hermes tools RPC stubs (file-based transport)."""
+"""Auto-generated Artemis tools RPC stubs (file-based transport)."""
 import json, os, shlex, tempfile, threading, time
 
-_RPC_DIR = os.environ.get("ARTEMIS_RPC_DIR") or os.path.join(tempfile.gettempdir(), "hermes_rpc")
+_RPC_DIR = os.environ.get("ARTEMIS_RPC_DIR") or os.path.join(tempfile.gettempdir(), "artemis_rpc")
 _seq = 0
 # `_seq += 1` is not atomic (read-modify-write), so concurrent _call()
 # invocations from multiple threads could allocate the same sequence number
@@ -1067,7 +1067,7 @@ def _execute_remote(
 ) -> str:
     """Run a script on the remote terminal backend via file-based RPC.
 
-    The script and the generated hermes_tools.py module are shipped to
+    The script and the generated artemis_tools.py module are shipped to
     the remote environment, and tool calls are proxied through a polling
     thread that communicates via request/response files.
     """
@@ -1086,7 +1086,7 @@ def _execute_remote(
 
     sandbox_id = uuid.uuid4().hex[:12]
     temp_dir = _env_temp_dir(env)
-    sandbox_dir = f"{temp_dir}/hermes_exec_{sandbox_id}"
+    sandbox_dir = f"{temp_dir}/artemis_exec_{sandbox_id}"
     quoted_sandbox_dir = shlex.quote(sandbox_dir)
     quoted_rpc_dir = shlex.quote(f"{sandbox_dir}/rpc")
 
@@ -1122,10 +1122,10 @@ def _execute_remote(
         rpc_token = secrets.token_urlsafe(32)
 
         # Generate and ship files
-        tools_src = generate_hermes_tools_module(
+        tools_src = generate_artemis_tools_module(
             list(sandbox_tools), transport="file",
         )
-        _ship_file_to_remote(env, f"{sandbox_dir}/hermes_tools.py", tools_src)
+        _ship_file_to_remote(env, f"{sandbox_dir}/artemis_tools.py", tools_src)
         _ship_file_to_remote(env, f"{sandbox_dir}/script.py", code)
 
         # Wrapped so the thread inherits the turn's approval context + callbacks
@@ -1259,7 +1259,7 @@ def execute_code(
 ) -> str:
     """
     Run a Python script in a sandboxed child process with RPC access
-    to a subset of Hermes tools.
+    to a subset of Artemis tools.
 
     Dispatches to the local (UDS) or remote (file-based RPC) path
     depending on the configured terminal backend.
@@ -1340,8 +1340,8 @@ def execute_code(
     if not sandbox_tools:
         sandbox_tools = SANDBOX_ALLOWED_TOOLS
 
-    # --- Set up temp directory with hermes_tools.py and script.py ---
-    tmpdir = tempfile.mkdtemp(prefix="hermes_sandbox_")
+    # --- Set up temp directory with artemis_tools.py and script.py ---
+    tmpdir = tempfile.mkdtemp(prefix="artemis_sandbox_")
     # Use /tmp on macOS to avoid the long /var/folders/... path that pushes
     # Unix domain socket paths past the 104-byte macOS AF_UNIX limit.
     # On Linux, tempfile.gettempdir() already returns /tmp.
@@ -1359,7 +1359,7 @@ def execute_code(
         sock_path = None  # not used on Windows; TCP endpoint stored below
         rpc_endpoint = None  # set after bind()
     else:
-        sock_path = os.path.join(_sock_tmpdir, f"hermes_rpc_{uuid.uuid4().hex}.sock")
+        sock_path = os.path.join(_sock_tmpdir, f"artemis_rpc_{uuid.uuid4().hex}.sock")
         rpc_endpoint = sock_path
 
     tool_call_log: list = []
@@ -1369,7 +1369,7 @@ def execute_code(
     stop_event = threading.Event()
 
     try:
-        # Write the auto-generated hermes_tools module.
+        # Write the auto-generated artemis_tools module.
         # encoding="utf-8" is required on Windows — the stub and user code
         # both contain non-ASCII characters (em-dashes in docstrings, plus
         # whatever the user script carries).  Python's default open() uses
@@ -1379,8 +1379,8 @@ def execute_code(
         # Python source files are decoded as UTF-8 by default (PEP 3120).
         # sandbox_tools is already the correct set (intersection with session
         # tools, or SANDBOX_ALLOWED_TOOLS as fallback — see lines above).
-        tools_src = generate_hermes_tools_module(list(sandbox_tools))
-        with open(os.path.join(tmpdir, "hermes_tools.py"), "w", encoding="utf-8") as f:
+        tools_src = generate_artemis_tools_module(list(sandbox_tools))
+        with open(os.path.join(tmpdir, "artemis_tools.py"), "w", encoding="utf-8") as f:
             f.write(tools_src)
 
         # Write the user's script
@@ -1456,7 +1456,7 @@ def execute_code(
         child_env["PYTHONUTF8"] = "1"
         # Inject user's configured timezone so datetime.now() in sandboxed
         # code reflects the correct wall-clock time.  Only TZ is set —
-        # ARTEMIS_TIMEZONE is an internal Hermes setting and must not leak
+        # ARTEMIS_TIMEZONE is an internal Artemis setting and must not leak
         # into child processes.
         _tz_name = os.getenv("ARTEMIS_TIMEZONE", "").strip()
         if _tz_name:
@@ -1476,25 +1476,25 @@ def execute_code(
         _child_cwd = _resolve_child_cwd(_mode, tmpdir, task_id=task_id or "")
         _script_path = os.path.join(tmpdir, "script.py")
 
-        # ``hermes_tools.py`` always lives in the staging directory, so that
+        # ``artemis_tools.py`` always lives in the staging directory, so that
         # directory must be importable even when project mode changes CWD.
-        # Hermes's own package root is useful too, but only when the child
+        # Artemis's own package root is useful too, but only when the child
         # uses the same Python environment. Project mode can select an
-        # external venv; exposing Hermes's site-packages to that interpreter
+        # external venv; exposing Artemis's site-packages to that interpreter
         # can mix incompatible compiled extensions (for example, Python 3.12
         # NumPy with a Python 3.9 project interpreter).
-        _hermes_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        _artemis_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         _existing_pp = child_env.get("PYTHONPATH", "")
         _pp_parts = [tmpdir]
-        if _uses_hermes_python_environment(_child_python):
-            _pp_parts.append(_hermes_root)
+        if _uses_artemis_python_environment(_child_python):
+            _pp_parts.append(_artemis_root)
         elif _child_python not in _external_env_logged:
             # Import behavior changes silently otherwise — surface it (once
             # per interpreter path) so "import artemis_constants suddenly
             # fails" reports are diagnosable without log spam.
             _external_env_logged.add(_child_python)
             logger.info(
-                "execute_code: child interpreter %s is outside the Hermes "
+                "execute_code: child interpreter %s is outside the Artemis "
                 "environment; artemis root omitted from PYTHONPATH",
                 _child_python,
             )
@@ -1650,7 +1650,7 @@ def execute_code(
 
         # Redact secrets (API keys, tokens, etc.) from sandbox output.
         # The sandbox env-var filter (lines 434-454) blocks os.environ access,
-        # but scripts can still read secrets from disk (e.g. open('~/.hermes/.env')).
+        # but scripts can still read secrets from disk (e.g. open('~/.artemis/.env')).
         # This ensures leaked secrets never enter the model context.
         # code_file=True: this is code-execution output — skip false-positive
         # ENV/JSON/f-string-template redaction; real credentials still masked.
@@ -1849,7 +1849,7 @@ _PROBE_CACHE_MAX = 32
 _usable_python_cache: dict = {}
 _python_prefix_cache: dict = {}
 
-# Interpreter paths already reported as outside the Hermes environment —
+# Interpreter paths already reported as outside the Artemis environment —
 # dedupes the exclusion log to once per path per process.
 _external_env_logged: set = set()
 
@@ -1924,8 +1924,8 @@ def _python_environment_prefix(python_path: str) -> str:
     return ""
 
 
-def _uses_hermes_python_environment(python_path: str) -> bool:
-    """Whether *python_path* belongs to Hermes's active Python environment.
+def _uses_artemis_python_environment(python_path: str) -> bool:
+    """Whether *python_path* belongs to Artemis's active Python environment.
 
     Short-circuits when *python_path* IS the running interpreter (by path or
     realpath) — no subprocess probe on the default strict-mode path, and no
@@ -2103,7 +2103,7 @@ def build_execute_code_schema(enabled_sandbox_tools: set = None,
     if mode == "strict":
         cwd_note = (
             "Scripts run in their own temp dir, not the session's CWD — use absolute paths "
-            "(os.path.expanduser('~/.hermes/.env')) or terminal()/read_file() for user files."
+            "(os.path.expanduser('~/.artemis/.env')) or terminal()/read_file() for user files."
         )
     else:
         cwd_note = (
@@ -2112,13 +2112,13 @@ def build_execute_code_schema(enabled_sandbox_tools: set = None,
         )
 
     description = (
-        "Run a Python script that calls Hermes tools programmatically. "
+        "Run a Python script that calls Artemis tools programmatically. "
         "Use when you need 3+ tool calls with logic between them: "
         "filtering/reducing large outputs before they enter context, "
         "conditional branching, or loops (N pages/files, retry on failure). "
         "Use normal tool calls for single calls, results you must reason "
         "over in full, or anything needing user interaction.\n\n"
-        f"Available via `from hermes_tools import ...`:\n\n"
+        f"Available via `from artemis_tools import ...`:\n\n"
         f"{tool_lines}\n\n"
         "Limits: 5-minute timeout, 50KB stdout cap, max 50 tool calls per script. "
         "terminal() is foreground-only (no background or pty).\n\n"
@@ -2140,7 +2140,7 @@ def build_execute_code_schema(enabled_sandbox_tools: set = None,
                     "type": "string",
                     "description": (
                         "Python code to execute. Import tools with "
-                        f"`from hermes_tools import {import_str}` "
+                        f"`from artemis_tools import {import_str}` "
                         "and print your final result to stdout."
                     ),
                 },

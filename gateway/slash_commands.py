@@ -7,7 +7,7 @@ lifting them into a mixin that ``GatewayRunner`` inherits keeps every
 ``self._handle_*_command`` dispatch + test reference working via the MRO, while
 removing the bulk from run.py.
 
-Module-level run.py helpers a handler needs (``_hermes_home``,
+Module-level run.py helpers a handler needs (``_artemis_home``,
 ``_load_gateway_config``, ``_resolve_gateway_model``, etc.) are imported lazily
 inside the handler body — a deferred ``from gateway.run import ...`` resolves at
 call time (run.py fully loaded by then), avoiding an import cycle.
@@ -104,7 +104,7 @@ class GatewaySlashCommandsMixin:
     async_session_store: AsyncSessionStore
 
     def _typed_command_prefix_for(self, platform) -> str:
-        """Return the prefix users can always type to reach Hermes commands.
+        """Return the prefix users can always type to reach Artemis commands.
 
         Reads the adapter's ``typed_command_prefix`` capability flag
         (default "/"). Slack and Matrix return "!" because typed "/"
@@ -340,7 +340,7 @@ class GatewaySlashCommandsMixin:
         ``_run_agent`` and ``_reset_notice_session_info`` — and the command
         reports the active profile and default home, byte-identical to before.
         """
-        from artemis_constants import display_hermes_home
+        from artemis_constants import display_artemis_home
         from artemis_cli.slash_exec import CommandContext, execute_command
 
         multiplexed = getattr(
@@ -357,9 +357,9 @@ class GatewaySlashCommandsMixin:
 
                 profile_home = self._resolve_profile_home_for_source(source)
                 with _profile_runtime_scope(profile_home):
-                    display = display_hermes_home()
+                    display = display_artemis_home()
             except Exception:
-                display = display_hermes_home()
+                display = display_artemis_home()
 
         # Shared executor resolves process-level fallbacks; the multiplexed
         # per-source overrides (when any) ride in via options.
@@ -1523,7 +1523,7 @@ class GatewaySlashCommandsMixin:
 
     async def _handle_restart_command(self, event: MessageEvent) -> Union[str, EphemeralReply]:
         """Handle /restart command - drain active work, then restart the gateway."""
-        from gateway.run import _hermes_home
+        from gateway.run import _artemis_home
         # Defensive idempotency check: if the previous gateway process
         # recorded this same /restart (same platform + update_id) and the new
         # process is seeing it *again*, this is a re-delivery caused by PTB's
@@ -1580,7 +1580,7 @@ class GatewaySlashCommandsMixin:
                     self._restart_command_source = event.source
             await asyncio.to_thread(
                 atomic_json_write,
-                _hermes_home / ".restart_notify.json",
+                _artemis_home / ".restart_notify.json",
                 notify_data,
                 indent=None,
             )
@@ -1601,7 +1601,7 @@ class GatewaySlashCommandsMixin:
                 dedup_data["update_id"] = event.platform_update_id
             await asyncio.to_thread(
                 atomic_json_write,
-                _hermes_home / ".restart_last_processed.json",
+                _artemis_home / ".restart_last_processed.json",
                 dedup_data,
                 indent=None,
             )
@@ -1634,7 +1634,7 @@ class GatewaySlashCommandsMixin:
         return EphemeralReply(t("gateway.restart.restarting"))
 
     async def _handle_version_command(self, event: MessageEvent) -> str:
-        """Handle /version — show the running Hermes Agent version."""
+        """Handle /version — show the running Artemis Agent version."""
         from artemis_cli.slash_exec import CommandContext, execute_command
 
         return execute_command("version", CommandContext(surface="gateway")).text
@@ -1682,7 +1682,7 @@ class GatewaySlashCommandsMixin:
           /model <name> --provider <provider> — switch provider + model
           /model --provider <provider>        — switch to provider, auto-detect model
         """
-        from gateway.run import _hermes_home, _load_gateway_config
+        from gateway.run import _artemis_home, _load_gateway_config
         from artemis_cli.model_switch import (
             switch_model as _switch_model, parse_model_switch_args,
             resolve_persist_behavior,
@@ -1734,7 +1734,7 @@ class GatewaySlashCommandsMixin:
         user_provs = None
         custom_provs = None
         excluded_provs = []
-        config_path = (_command_profile_home or _hermes_home) / "config.yaml"
+        config_path = (_command_profile_home or _artemis_home) / "config.yaml"
         try:
             cfg = _load_gateway_config()
             if cfg:
@@ -2451,7 +2451,7 @@ class GatewaySlashCommandsMixin:
 
         Same surface as the CLI handler in cli.py:
             /codex-runtime                  — show current state
-            /codex-runtime auto             — Hermes default runtime
+            /codex-runtime auto             — Artemis default runtime
             /codex-runtime codex_app_server — codex subprocess runtime
             /codex-runtime on / off         — synonyms
 
@@ -3200,7 +3200,7 @@ class GatewaySlashCommandsMixin:
         ``/diff`` (default) shows unstaged + untracked changes, ``/diff
         staged`` the staged ones, ``/diff all`` everything since HEAD, and
         ``/diff session`` the cumulative checkpoint-baseline diff of what
-        Hermes itself changed. ``--stat`` limits output to the summary.
+        Artemis itself changed. ``--stat`` limits output to the summary.
 
         The diff body is truncated hard here (messaging surfaces are not a
         pager); platform senders additionally split/clamp long messages to
@@ -3344,9 +3344,9 @@ class GatewaySlashCommandsMixin:
     def _save_gateway_config_key(self, key_path: str, value) -> bool:
         """Save a dot-separated key to config.yaml (shared by /reasoning, /fast
         and their interactive pickers)."""
-        from gateway.run import _hermes_home
+        from gateway.run import _artemis_home
         from artemis_cli.config import read_user_config_raw
-        config_path = _hermes_home / "config.yaml"
+        config_path = _artemis_home / "config.yaml"
         try:
             # Write-back round-trip: raw read is correct (merged defaults must
             # not be persisted back to the user's file).
@@ -3588,7 +3588,7 @@ class GatewaySlashCommandsMixin:
         Gate changes persist to config.yaml and evict the cached agent so the
         new setting takes effect on the next message.
         """
-        from gateway.run import _hermes_home
+        from gateway.run import _artemis_home
         from artemis_cli.write_approval_commands import handle_pending_subcommand
         from tools import write_approval as wa
         from tools.memory_tool import load_on_disk_store
@@ -3596,7 +3596,7 @@ class GatewaySlashCommandsMixin:
         raw_args = event.get_command_args().strip()
         args = raw_args.split() if raw_args else []
         session_key = self._session_key_for_source(event.source)
-        config_path = _hermes_home / "config.yaml"
+        config_path = _artemis_home / "config.yaml"
 
         def _set_approval(enabled: bool):
             # Write-back round-trip: raw read is correct (merged defaults must
@@ -3633,18 +3633,18 @@ class GatewaySlashCommandsMixin:
         stranded).
 
         ``diff`` output is truncated for chat bubbles — the full diff lives in
-        the pending JSON file under ``~/.hermes/pending/skills/``. (Note this is
+        the pending JSON file under ``~/.artemis/pending/skills/``. (Note this is
         the write-approval ``diff <id>``; the CLI also has an unrelated
         ``artemis skills diff <name>`` that diffs a bundled skill vs stock.)
         """
-        from gateway.run import _hermes_home
+        from gateway.run import _artemis_home
         from artemis_cli.write_approval_commands import handle_pending_subcommand
         from tools import write_approval as wa
 
         raw_args = event.get_command_args().strip()
         args = raw_args.split() if raw_args else []
         session_key = self._session_key_for_source(event.source)
-        config_path = _hermes_home / "config.yaml"
+        config_path = _artemis_home / "config.yaml"
 
         gate_on = wa.write_approval_enabled(wa.SKILLS)
         wants_toggle = bool(args) and args[0].lower() in {"approval", "mode"}
@@ -3679,7 +3679,7 @@ class GatewaySlashCommandsMixin:
             pending_id = args[1] if len(args) > 1 else "<id>"
             out = (out[:3000]
                    + "\n… (truncated — full diff in "
-                     f"~/.hermes/pending/skills/{pending_id}.json)")
+                     f"~/.artemis/pending/skills/{pending_id}.json)")
         return out
 
     async def _handle_fast_command(self, event: MessageEvent) -> Optional[str]:
@@ -3810,9 +3810,9 @@ class GatewaySlashCommandsMixin:
         ``display.platforms.<platform>.tool_progress`` so each channel can
         have its own verbosity level independently.
         """
-        from gateway.run import _hermes_home, _load_gateway_config, _platform_config_key
+        from gateway.run import _artemis_home, _load_gateway_config, _platform_config_key
 
-        config_path = _hermes_home / "config.yaml"
+        config_path = _artemis_home / "config.yaml"
         platform_key = _platform_config_key(event.source.platform)
 
         # --- check config gate ------------------------------------------------
@@ -3879,10 +3879,10 @@ class GatewaySlashCommandsMixin:
         are respected but not modified here — edit config.yaml directly for
         per-platform control.
         """
-        from gateway.run import _hermes_home, _load_gateway_config, _platform_config_key, _resolve_gateway_model
+        from gateway.run import _artemis_home, _load_gateway_config, _platform_config_key, _resolve_gateway_model
         from gateway.runtime_footer import resolve_footer_config
 
-        config_path = _hermes_home / "config.yaml"
+        config_path = _artemis_home / "config.yaml"
         platform_key = _platform_config_key(event.source.platform)
 
         # --- parse argument -------------------------------------------------
@@ -5584,14 +5584,14 @@ class GatewaySlashCommandsMixin:
         return await loop.run_in_executor(None, _collect_and_upload)
 
     async def _handle_update_command(self, event: MessageEvent) -> str:
-        """Handle /update command — update Hermes Agent to the latest version.
+        """Handle /update command — update Artemis Agent to the latest version.
 
         Spawns ``artemis update`` in a detached session (via ``setsid``) so it
         survives the gateway restart that ``artemis update`` may trigger. Marker
         files are written so either the current gateway process or the next one
         can notify the user when the update finishes.
         """
-        from gateway.run import _hermes_home, _resolve_hermes_bin
+        from gateway.run import _artemis_home, _resolve_artemis_bin
         import json
         import shutil
         import subprocess
@@ -5612,7 +5612,7 @@ class GatewaySlashCommandsMixin:
                 return t("gateway.update.platform_not_messaging")
 
         if is_managed():
-            return f"✗ {format_managed_message('update Hermes Agent')}"
+            return f"✗ {format_managed_message('update Artemis Agent')}"
 
         project_root = Path(__file__).parent.parent.resolve()
         git_dir = project_root / '.git'
@@ -5620,13 +5620,13 @@ class GatewaySlashCommandsMixin:
         if not git_dir.exists():
             return t("gateway.update.not_git_repo")
 
-        hermes_cmd = _resolve_hermes_bin()
-        if not hermes_cmd:
-            return t("gateway.update.hermes_cmd_not_found")
+        artemis_cmd = _resolve_artemis_bin()
+        if not artemis_cmd:
+            return t("gateway.update.artemis_cmd_not_found")
 
-        pending_path = _hermes_home / ".update_pending.json"
-        output_path = _hermes_home / ".update_output.txt"
-        exit_code_path = _hermes_home / ".update_exit_code"
+        pending_path = _artemis_home / ".update_pending.json"
+        output_path = _artemis_home / ".update_output.txt"
+        exit_code_path = _artemis_home / ".update_exit_code"
         session_key = self._session_key_for_source(event.source)
         pending = {
             "platform": event.source.platform.value,
@@ -5674,7 +5674,7 @@ class GatewaySlashCommandsMixin:
                 import textwrap
                 from artemis_cli._subprocess_compat import windows_detach_popen_kwargs
 
-                # hermes_cmd is a list of argv parts we can pass directly
+                # artemis_cmd is a list of argv parts we can pass directly
                 # (no shell-quoting needed).
                 helper = textwrap.dedent(
                     """
@@ -5695,16 +5695,16 @@ class GatewaySlashCommandsMixin:
                     [
                         sys.executable, "-c", helper,
                         str(output_path), str(exit_code_path),
-                        *hermes_cmd, "update", "--gateway",
+                        *artemis_cmd, "update", "--gateway",
                     ],
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     **windows_detach_popen_kwargs(),
                 )
             else:
-                hermes_cmd_str = " ".join(shlex.quote(part) for part in hermes_cmd)
+                artemis_cmd_str = " ".join(shlex.quote(part) for part in artemis_cmd)
                 update_cmd = (
-                    f"PYTHONUNBUFFERED=1 {hermes_cmd_str} update --gateway"
+                    f"PYTHONUNBUFFERED=1 {artemis_cmd_str} update --gateway"
                     f" > {shlex.quote(str(output_path))} 2>&1; "
                     # Avoid `status=$?`: `status` is a read-only special parameter
                     # in zsh, and this command string is copied/reused in macOS/zsh

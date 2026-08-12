@@ -350,7 +350,7 @@ def _audit_path() -> Path:
         from artemis_constants import get_artemis_home
         base = Path(get_artemis_home())
     except Exception:
-        base = Path(os.path.expanduser("~/.hermes"))
+        base = Path(os.path.expanduser("~/.artemis"))
     return base / "a2a_audit.jsonl"
 
 
