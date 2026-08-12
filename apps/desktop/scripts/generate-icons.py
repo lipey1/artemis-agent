@@ -1,43 +1,48 @@
 #!/usr/bin/env python3
-"""Regenerate Artemis app icons with visible squircle corners.
+"""Regenerate Artemis app icons with squircle-clipped transparent corners.
 
-Source artwork: public/artemis.png
-Outputs: assets/icon.png, assets/linux-icons/*, public/apple-touch-icon.png
-Also run ImageMagick for icon.ico / icon.icns after this script.
+Loads square master artwork, resizes full-bleed, clips the entire composite
+(background + artwork) to a superellipse so corner pixels are transparent.
+
+Source: assets/artemis-source.png (square master; bootstrapped from public/artemis.png)
+Outputs: assets/icon.png, assets/linux-icons/*, public/artemis.png,
+         public/apple-touch-icon.png, icon.ico, icon.icns
 """
 from __future__ import annotations
 
-import os
 import subprocess
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / 'public' / 'artemis.png'
+SOURCE = ROOT / 'assets' / 'artemis-source.png'
+SOURCE_BOOTSTRAP = ROOT / 'public' / 'artemis.png'
 OUT_DIR = ROOT / 'assets'
 LINUX_DIR = OUT_DIR / 'linux-icons'
 SIZES = (16, 22, 24, 32, 48, 64, 72, 96, 128, 256, 512, 1024)
 
-# Visible dock rounding: margin + superellipse clip.
-CORNER_RADIUS_PCT = 0.225
-CONTENT_SCALE = 0.90
-SHADOW = True
+# ~20% corner radius feel via superellipse exponent (n=4 is standard squircle).
+SUPERELLIPSE_N = 4.0
 
 
-def squircle_mask(size: int, radius: int) -> Image.Image:
-    mask = Image.new('L', (size, size), 0)
-    draw = ImageDraw.Draw(mask)
-    r = min(radius, size // 2)
-    draw.rounded_rectangle((0, 0, size - 1, size - 1), radius=r, fill=255)
-    return mask
+def ensure_source() -> Path:
+    if SOURCE.is_file():
+        return SOURCE
+    if SOURCE_BOOTSTRAP.is_file():
+        SOURCE.parent.mkdir(parents=True, exist_ok=True)
+        Image.open(SOURCE_BOOTSTRAP).convert('RGBA').save(SOURCE, 'PNG')
+        print(f'Bootstrapped square master: {SOURCE}')
+        return SOURCE
+    raise FileNotFoundError(f'Missing artwork: {SOURCE} or {SOURCE_BOOTSTRAP}')
 
 
-def superellipse_mask(size: int, n: float = 4.5) -> Image.Image:
+def superellipse_mask(size: int, n: float = SUPERELLIPSE_N, scale: float = 1.0) -> Image.Image:
+    """Superellipse (squircle) alpha mask. scale < 1 shrinks the visible area."""
     mask = Image.new('L', (size, size), 0)
     cx = cy = (size - 1) / 2.0
-    a = b = size / 2.0
+    a = b = (size / 2.0) * scale
     px = mask.load()
     for y in range(size):
         for x in range(size):
@@ -48,54 +53,92 @@ def superellipse_mask(size: int, n: float = 4.5) -> Image.Image:
     return mask
 
 
-def generate_icon(size: int) -> Image.Image:
-    src = Image.open(SOURCE).convert('RGBA')
-    inner = max(1, int(size * CONTENT_SCALE))
-    src_scaled = src.resize((inner, inner), Image.LANCZOS)
+def mask_params(size: int) -> tuple[float, float]:
+    """Size-adaptive squircle: small dock icons need rounder clipping."""
+    if size <= 32:
+        return 3.0, 0.88
+    if size <= 48:
+        return 3.0, 0.90
+    if size <= 64:
+        return 3.5, 0.95
+    return SUPERELLIPSE_N, 1.0
 
-    canvas = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-    ox = (size - inner) // 2
-    oy = (size - inner) // 2
 
-    if SHADOW and size >= 64:
-        shadow = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-        shadow_layer = Image.new('RGBA', (inner, inner), (0, 0, 0, 180))
-        blur = max(2, size // 64)
-        shadow_layer = shadow_layer.filter(ImageFilter.GaussianBlur(blur))
-        shadow.paste(
-            shadow_layer,
-            (ox + max(1, size // 128), oy + max(1, size // 96)),
-            shadow_layer,
-        )
-        canvas = Image.alpha_composite(canvas, shadow)
-
-    canvas.paste(src_scaled, (ox, oy), src_scaled)
-
-    radius = int(size * CORNER_RADIUS_PCT)
-    mask = superellipse_mask(size) if size >= 128 else squircle_mask(size, radius)
+def generate_icon(source: Image.Image, size: int) -> Image.Image:
+    composite = source.resize((size, size), Image.LANCZOS)
+    n, scale = mask_params(size)
+    mask = superellipse_mask(size, n=n, scale=scale)
     result = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-    result.paste(canvas, (0, 0), mask)
+    result.paste(composite, (0, 0), mask)
     return result
 
 
+def verify_corners(img: Image.Image, label: str) -> list[str]:
+    """Return list of verification errors."""
+    errors: list[str] = []
+    w, h = img.size
+
+    # Exact corners must be fully transparent.
+    for x, y in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)):
+        px = img.getpixel((x, y))
+        if px[3] != 0:
+            errors.append(f'{label}: corner ({x},{y}) alpha={px[3]}, expected 0')
+
+    # Near-corner pixels along diagonals must also be transparent (visible rounding).
+    # Depth scales with icon size; large icons drive GNOME app search.
+    if w >= 128:
+        depth = max(8, int(w * 0.06))
+    elif w >= 48:
+        depth = 4
+    else:
+        depth = 1
+
+    for d in range(1, depth + 1):
+        for x, y in ((d, d), (w - 1 - d, d), (d, h - 1 - d), (w - 1 - d, h - 1 - d)):
+            px = img.getpixel((x, y))
+            if px[3] != 0:
+                errors.append(
+                    f'{label}: corner zone ({x},{y}) offset {d} alpha={px[3]}, expected 0'
+                )
+    return errors
+
+
 def main() -> int:
-    if not SOURCE.is_file():
-        print(f'Missing source artwork: {SOURCE}', file=sys.stderr)
-        return 1
+    source_path = ensure_source()
+    source = Image.open(source_path).convert('RGBA')
 
     LINUX_DIR.mkdir(parents=True, exist_ok=True)
 
-    master = generate_icon(1024)
+    all_errors: list[str] = []
+
+    master = generate_icon(source, 1024)
     master.save(OUT_DIR / 'icon.png', 'PNG')
     print(f'Wrote {OUT_DIR / "icon.png"}')
 
+    master.save(ROOT / 'public' / 'artemis.png', 'PNG')
+    print(f'Wrote {ROOT / "public" / "artemis.png"}')
+
     for size in SIZES:
         out = LINUX_DIR / f'{size}x{size}.png'
-        generate_icon(size).save(out, 'PNG')
+        icon = generate_icon(source, size)
+        icon.save(out, 'PNG')
+        all_errors.extend(verify_corners(icon, f'{size}x{size}'))
         print(f'Wrote {out}')
 
-    generate_icon(180).save(ROOT / 'public' / 'apple-touch-icon.png', 'PNG')
+    apple = generate_icon(source, 180)
+    apple.save(ROOT / 'public' / 'apple-touch-icon.png', 'PNG')
+    all_errors.extend(verify_corners(apple, '180 apple-touch'))
     print(f'Wrote {ROOT / "public" / "apple-touch-icon.png"}')
+
+    all_errors.extend(verify_corners(generate_icon(source, 256), '256 verify'))
+
+    if all_errors:
+        print('\nVERIFICATION FAILED:', file=sys.stderr)
+        for err in all_errors:
+            print(f'  - {err}', file=sys.stderr)
+        return 1
+
+    print('\nVerification passed: all corner pixels transparent, no beige in corner zones.')
 
     icon_png = OUT_DIR / 'icon.png'
     subprocess.run(
