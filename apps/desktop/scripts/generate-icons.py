@@ -99,8 +99,13 @@ def mask_params(size: int) -> tuple[float, float]:
     return SUPERELLIPSE_N, 1.0
 
 
-def generate_icon(source: Image.Image, size: int) -> Image.Image:
+def generate_icon(source: Image.Image, size: int, *, linux_dock: bool = False) -> Image.Image:
     composite = source.resize((size, size), Image.LANCZOS)
+    # GNOME/Ubuntu dock icons (<=48px hicolor) render without compositing
+    # transparent corners onto the panel — squircle clipping makes them look
+    # blank/invisible. Keep small Linux theme sizes fully opaque.
+    if linux_dock and size <= 48:
+        return composite
     n, scale = mask_params(size)
     mask = superellipse_mask(size, n=n, scale=scale)
     result = Image.new('RGBA', (size, size), (0, 0, 0, 0))
@@ -197,6 +202,27 @@ def verify_center_opaque(img: Image.Image, label: str) -> list[str]:
     return errors
 
 
+def verify_opaque_bbox_ratio(
+    img: Image.Image, label: str, min_ratio: float = 0.30
+) -> list[str]:
+    """Dock icons need enough opaque pixels inside the opaque bounding box."""
+    errors: list[str] = []
+    bbox = img.getbbox()
+    if not bbox:
+        errors.append(f'{label}: fully transparent image')
+        return errors
+
+    cropped = img.crop(bbox)
+    data = list(cropped.getdata())
+    opaque = sum(1 for p in data if p[3] > 200)
+    ratio = opaque / len(data) if data else 0.0
+    if ratio < min_ratio:
+        errors.append(
+            f'{label}: opaque bbox ratio {ratio:.1%} < {min_ratio:.0%} in {bbox}'
+        )
+    return errors
+
+
 def main() -> int:
     source_path = ensure_source()
     raw = Image.open(source_path).convert('RGBA')
@@ -218,12 +244,26 @@ def main() -> int:
 
     for size in SIZES:
         out = LINUX_DIR / f'{size}x{size}.png'
-        icon = generate_icon(source, size)
+        icon = generate_icon(source, size, linux_dock=True)
         icon.save(out, 'PNG')
-        all_errors.extend(verify_corners(icon, f'{size}x{size}'))
+        if size > 48:
+            all_errors.extend(verify_corners(icon, f'{size}x{size}'))
         all_errors.extend(verify_center_opaque(icon, f'{size}x{size}'))
         if size in (48, 256, 1024):
             all_errors.extend(verify_square_content(icon, f'{size}x{size}'))
+        if size == 48:
+            all_errors.extend(verify_opaque_bbox_ratio(icon, f'{size}x{size}'))
+            # Small dock sizes must not rely on transparent squircle corners.
+            corners = (
+                icon.getpixel((0, 0))[3],
+                icon.getpixel((size - 1, 0))[3],
+                icon.getpixel((0, size - 1))[3],
+                icon.getpixel((size - 1, size - 1))[3],
+            )
+            if any(alpha < 200 for alpha in corners):
+                all_errors.append(
+                    f'{size}x{size}: dock corner alpha {corners}, expected fully opaque'
+                )
         if size == 256:
             all_errors.extend(verify_no_black_bars(icon, f'{size}x{size}'))
         print(f'Wrote {out}')

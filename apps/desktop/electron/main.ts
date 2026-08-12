@@ -274,6 +274,7 @@ const DEV_SERVER = process.env.ARTEMIS_DESKTOP_DEV_SERVER
 const IS_PACKAGED = app.isPackaged || Boolean(process.env.ARTEMIS_DESKTOP_IS_PACKAGED)
 const IS_MAC = process.platform === 'darwin'
 const IS_WINDOWS = process.platform === 'win32'
+const IS_LINUX = process.platform === 'linux'
 const IS_WSL = isWslEnvironment()
 // Truthful macOS kernel major (Tahoe = 25). Product version lies (16 vs 26) per
 // build SDK, so gate Tahoe workarounds on Darwin instead.
@@ -716,6 +717,9 @@ const APP_ICON_PATHS = [
   ...(IS_WINDOWS
     ? [path.join(process.resourcesPath ?? '', 'icon.ico'), path.join(APP_ROOT, 'assets', 'icon.ico')]
     : [
+        // Linux/macOS window icons must live outside app.asar — Chromium's WM_ICON
+        // path on Linux does not reliably load PNGs from the asar virtual fs.
+        path.join(process.resourcesPath ?? '', 'icon.png'),
         path.join(APP_ROOT, 'assets', 'icon.png'),
         path.join(unpackedPathFor(APP_ROOT), 'assets', 'icon.png')
       ]),
@@ -5413,6 +5417,21 @@ function registerPowerResumeListeners() {
 
 function getAppIconPath() {
   return APP_ICON_PATHS.find(fileExists)
+}
+
+function configureAppIcon() {
+  const icon = getAppIconPath()
+
+  if (!icon) {
+    return
+  }
+
+  // macOS dock icon is also set per-window in createWindow(); Linux GNOME/Ubuntu
+  // dock reads the app/window icon via _NET_WM_ICON and needs an explicit
+  // app.setIcon plus a real filesystem path (see APP_ICON_PATHS).
+  if (IS_LINUX) {
+    app.setIcon(icon)
+  }
 }
 
 function sendOpenUpdatesRequested() {
@@ -12155,6 +12174,7 @@ app.whenReady().then(() => {
   // it without the renderer visiting Settings. A failed registration is logged
   // here and surfaced in Settings via the IPC state (never silent).
   applyQuickEntrySettings(readQuickEntrySettings())
+  configureAppIcon()
 
   if (IS_MAC) {
     const reposition = () => wakeIndicatorController.reposition()
