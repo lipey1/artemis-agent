@@ -41,11 +41,13 @@ test('runBootstrap bails immediately when the signal is already aborted', async 
     abortSignal: controller.signal
   })
 
-  // Cancelled before any install script is spawned.
+  // Cancelled before any install script is spawned. Soft cancel: no failed event
+  // (that would latch the red boot-failure overlay).
   assert.deepEqual(result, { ok: false, cancelled: true })
-  assert.ok(
-    events.some(ev => ev.type === 'failed' && /cancelled/i.test(ev.error)),
-    'should emit a cancelled failure event'
+  assert.equal(
+    events.some(ev => ev.type === 'failed'),
+    false,
+    'should not emit a failed event for user cancel'
   )
 })
 

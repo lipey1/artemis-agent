@@ -15,6 +15,7 @@ import type {
   DesktopBootstrapState
 } from '@/global'
 import { useI18n } from '@/i18n'
+import { stripAnsi } from '@/lib/ansi'
 import { AlertCircle, ChevronDown, ChevronRight, Globe, iconSize, Loader2, Monitor } from '@/lib/icons'
 import { capitalize } from '@/lib/text'
 import { cn } from '@/lib/utils'
@@ -234,7 +235,8 @@ function applyEvent(state: DesktopBootstrapState, ev: DesktopBootstrapEvent): De
   }
 
   if (ev.type === 'log') {
-    const next = state.log.concat({ ts: Date.now(), stage: ev.stage ?? null, line: ev.line, stream: ev.stream })
+    const line = stripAnsi(ev.line || '')
+    const next = state.log.concat({ ts: Date.now(), stage: ev.stage ?? null, line, stream: ev.stream })
 
     while (next.length > 500) {
       next.shift()
@@ -325,6 +327,14 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
       off?.()
     }
   }, [enabled])
+
+  // Soft cancel returns to setup-choice while cancelling=true; clear it so a
+  // subsequent local install shows an enabled Cancel button again.
+  useEffect(() => {
+    if (state.setupChoice) {
+      setCancelling(false)
+    }
+  }, [state.setupChoice])
 
   // Autoscroll log to bottom when new lines arrive AND the log is open
   useEffect(() => {

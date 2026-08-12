@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { test, vi } from 'vitest'
 
 import { createFirstRunSetupGate } from './first-run-setup-gate'
-import { FirstRunSetupResetError, runPrimaryBackendStartup } from './primary-backend-startup'
+import { FirstRunRemoteAppliedError, FirstRunSetupResetError, runPrimaryBackendStartup } from './primary-backend-startup'
 
 const bootstrapBackend = {
   activeRoot: '/tmp/artemis-home/artemis-agent',
@@ -107,4 +107,26 @@ test('reset rejects with a typed error and never enters either backend', async (
   await assert.rejects(pending, error => error instanceof FirstRunSetupResetError && error.firstRunSetupReset)
   assert.equal(options.connectRemote.mock.calls.length, 0)
   assert.equal(options.ensureLocalRuntime.mock.calls.length, 0)
+})
+
+test('remote applied from ensureLocalRuntime switches to the remote path', async () => {
+  const savedRemote = { baseUrl: 'https://gateway.example.com/artemis' }
+
+  const options = startupOptions({
+    ensureLocalRuntime: vi.fn(async () => {
+      throw new FirstRunRemoteAppliedError()
+    }),
+    resolveRemote: vi
+      .fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(savedRemote),
+    waitForDecision: vi.fn(async () => 'continue-local' as const)
+  })
+
+  assert.deepEqual(await runPrimaryBackendStartup(options), {
+    kind: 'remote',
+    connection: { baseUrl: savedRemote.baseUrl, mode: 'remote' }
+  })
+  assert.equal(options.ensureLocalRuntime.mock.calls.length, 1)
+  assert.deepEqual(options.connectRemote.mock.calls, [[savedRemote]])
 })

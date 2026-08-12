@@ -2,7 +2,7 @@
   "name": "artemis",
   "productName": "Artemis",
   "private": true,
-  "version": "0.17.5",
+  "version": "0.17.6",
   "description": "Artemis Desktop. UI source is in apps/desktop.",
   "author": "Artemis / lipey1",
   "license": "MIT",

@@ -21,6 +21,19 @@ export class FirstRunSetupResetError extends Error {
   }
 }
 
+/** Thrown from ensureLocalRuntime when the user cancels local install and then
+ *  applies a remote gateway from the re-prompted first-run choice. The startup
+ *  orchestrator switches to the remote path instead of treating it as a boot
+ *  failure. */
+export class FirstRunRemoteAppliedError extends Error {
+  readonly firstRunRemoteApplied = true
+
+  constructor() {
+    super('First-run remote setup was applied after local install was cancelled.')
+    this.name = 'FirstRunRemoteAppliedError'
+  }
+}
+
 // Owns the production startArtemis path up to the local process spawn. Keeping
 // the full ordering here makes the first-run remote boundary executable in a
 // test: an already-saved remote wins immediately; otherwise update exclusion
@@ -61,5 +74,19 @@ export async function runPrimaryBackendStartup<Backend, RuntimeBackend, Remote, 
     throw new FirstRunSetupResetError()
   }
 
-  return { kind: 'local', backend: await ensureLocalRuntime(backend) }
+  try {
+    return { kind: 'local', backend: await ensureLocalRuntime(backend) }
+  } catch (error) {
+    if (!(error instanceof FirstRunRemoteAppliedError) && !(error as { firstRunRemoteApplied?: boolean })?.firstRunRemoteApplied) {
+      throw error
+    }
+
+    const appliedRemote = await resolveRemote()
+
+    if (!appliedRemote) {
+      throw new Error('First-run remote setup completed without a saved remote backend.')
+    }
+
+    return { kind: 'remote', connection: await connectRemote(appliedRemote) }
+  }
 }

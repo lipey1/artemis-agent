@@ -574,3 +574,38 @@ describe('DesktopInstallOverlay first-run setup', () => {
     expect(screen.queryByText('Artemis needs a one-time install')).toBeNull()
   })
 })
+
+describe('DesktopInstallOverlay installer output', () => {
+  it('strips ANSI escape sequences from live log lines', async () => {
+    Element.prototype.scrollIntoView = vi.fn()
+
+    const desktop = installDesktopMock(
+      bootstrapState({
+        active: true,
+        startedAt: Date.now(),
+        manifest: { type: 'manifest', protocolVersion: 1, stages: [] }
+      })
+    )
+
+    render(<DesktopInstallOverlay />)
+
+    expect(await screen.findByText(/Fetching installer manifest/i)).toBeTruthy()
+
+    fireEvent.click(screen.getByText(/Show installer output/i))
+
+    act(() => {
+      desktop.emitBootstrapEvent({
+        type: 'log',
+        stage: 'repository',
+        stream: 'stdout',
+        line: '\u001b[0;32m✓\u001b[0m cloned\u001b[0;36m→\u001b[0m done'
+      })
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText(/✓ cloned→ done/)).toBeTruthy()
+    })
+    expect(screen.queryByText(/\[0;32m/)).toBeNull()
+    expect(screen.queryByText(/ESC/)).toBeNull()
+  })
+})

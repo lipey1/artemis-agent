@@ -873,16 +873,10 @@ async function runBootstrap(opts) {
 
   // Bail before spawning anything if the user already cancelled — otherwise an
   // already-aborted signal would still fetch the manifest (a spawn) before the
-  // in-loop abort check fires.
+  // in-loop abort check fires. Soft cancel: do NOT emit type:'failed' (that
+  // drives the red install-failure / boot-failure UI). Main re-prompts the
+  // first-run choice instead.
   if (abortSignal && abortSignal.aborted) {
-    if (typeof onEvent === 'function') {
-      try {
-        onEvent({ type: 'failed', error: 'bootstrap cancelled by user' })
-      } catch {
-        void 0
-      }
-    }
-
     return { ok: false, cancelled: true }
   }
 
@@ -956,8 +950,6 @@ async function runBootstrap(opts) {
     //    client-side.
     for (const stage of manifest.stages) {
       if (abortSignal && abortSignal.aborted) {
-        emit({ type: 'failed', error: 'bootstrap cancelled by user' })
-
         return { ok: false, cancelled: true }
       }
 
@@ -974,9 +966,21 @@ async function runBootstrap(opts) {
       })
 
       if (ev.state === 'failed') {
-        emit({ type: 'failed', stage: stage.name, error: (ev as any).error || 'stage failed' })
+        const stageError = (ev as any).error || 'stage failed'
+        // Mid-stage Cancel kills the installer child (result.killed). That used
+        // to fall through as a hard stage failure ("bootstrap failed at stage
+        // 'repository': cancelled by user") and latch the red boot-failure
+        // overlay. Treat user abort as soft cancel instead.
+        const cancelledByUser =
+          Boolean(abortSignal && abortSignal.aborted) || stageError === 'cancelled by user'
 
-        return { ok: false, failedStage: stage.name, error: (ev as any).error }
+        if (cancelledByUser) {
+          return { ok: false, cancelled: true }
+        }
+
+        emit({ type: 'failed', stage: stage.name, error: stageError })
+
+        return { ok: false, failedStage: stage.name, error: stageError }
       }
     }
 

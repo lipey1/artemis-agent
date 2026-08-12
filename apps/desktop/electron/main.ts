@@ -159,7 +159,7 @@ import { runNativeLogin } from './native-oauth-login'
 import { loadNativeTokenSet, type NativeTokenStoreIo, persistNativeTokenSet } from './native-token-store'
 import { serializeJsonBody, setJsonRequestHeaders } from './oauth-net-request'
 import { createKeepAwake } from './power-save'
-import { FirstRunSetupResetError, runPrimaryBackendStartup } from './primary-backend-startup'
+import { FirstRunRemoteAppliedError, FirstRunSetupResetError, runPrimaryBackendStartup } from './primary-backend-startup'
 import { rehomePrimaryConnection } from './primary-connection-rehome'
 import { decideProfileDeleteAction, profileNameFromDeleteRequest, resolveRouteProfile } from './profile-delete-routing'
 import { fetchPrimaryProfileSessions } from './profile-session-routing'
@@ -182,6 +182,7 @@ import {
   SESSION_WINDOW_MIN_WIDTH
 } from './session-windows'
 import { ensureSpawnHelperExecutable } from './spawn-helper-perms'
+import { stripAnsi } from './strip-ansi'
 import { createBootstrapCoordinator, sshConfigFingerprint } from './ssh-bootstrap-coordinator'
 import { collectSshConfigHosts, parseSshGOutput } from './ssh-config'
 import {
@@ -1565,7 +1566,11 @@ function broadcastBootstrapEvent(ev) {
       error: ev.error ?? null
     }
   } else if (ev.type === 'log') {
-    bootstrapState.log.push({ ts: Date.now(), stage: ev.stage || null, line: ev.line, stream: ev.stream || 'stdout' })
+    // Strip ANSI for the in-app installer log. desktop.log still gets the raw
+    // event via rememberLog in the bootstrap onEvent tee.
+    const line = stripAnsi(String(ev.line || ''))
+    ev = { ...ev, line }
+    bootstrapState.log.push({ ts: Date.now(), stage: ev.stage || null, line, stream: ev.stream || 'stdout' })
 
     if (bootstrapState.log.length > BOOTSTRAP_LOG_RING_MAX) {
       bootstrapState.log.splice(0, bootstrapState.log.length - BOOTSTRAP_LOG_RING_MAX)
@@ -4147,87 +4152,109 @@ async function ensureRuntime(backend) {
       throw handoffError
     }
 
-    // Eagerly flip the bootstrap UI state to 'active' so the renderer
-    // shows the install overlay BEFORE the runner finishes fetching the
-    // manifest (which on slow networks can take tens of seconds and would
-    // otherwise leave the user staring at the generic 'Preparing' splash).
-    // We emit a synthetic manifest with an empty stages list -- the real
-    // manifest event will overwrite it once install.ps1 -Manifest returns.
-    try {
-      broadcastBootstrapEvent({
-        type: 'manifest',
-        stages: [],
-        protocolVersion: null
-      })
-    } catch {
-      void 0
-    }
-
-    bootstrapAbortController = new AbortController()
-
     // The repair request has been honoured by reaching the installer; clear it
     // so a later boot isn't forced through bootstrap again.
     bootstrapRepairRequested = false
     bootstrapRepairAttempt = 0
 
-    const bootstrapResult = await runBootstrap({
-      installStamp: backend.installStamp,
-      activeRoot: backend.activeRoot,
-      sourceRepoRoot: SOURCE_REPO_ROOT,
-      artemisHome: ARTEMIS_HOME,
-      logRoot: path.join(ARTEMIS_HOME, 'logs'),
-      abortSignal: bootstrapAbortController.signal,
-      onEvent: ev => {
-        // Tee every bootstrap event to (a) the desktop log for forensics
-        // and (b) the renderer for live progress UI. Either may be absent;
-        // tolerate both gracefully so a renderer crash doesn't stall the
-        // bootstrap and a log-write failure doesn't suppress the UI signal.
-        try {
-          rememberLog(`[bootstrap] ${JSON.stringify(ev)}`)
-        } catch {
-          void 0
+    // Soft-cancel loop: Cancel install returns to the first-run choice instead
+    // of latching a fatal "Artemis couldn't start" boot failure. Real installer
+    // failures still throw and latch below.
+    for (;;) {
+      // Eagerly flip the bootstrap UI state to 'active' so the renderer shows
+      // the install overlay BEFORE the runner finishes fetching the manifest.
+      try {
+        broadcastBootstrapEvent({
+          type: 'manifest',
+          stages: [],
+          protocolVersion: null
+        })
+      } catch {
+        void 0
+      }
+
+      bootstrapAbortController = new AbortController()
+
+      const bootstrapResult = await runBootstrap({
+        installStamp: backend.installStamp,
+        activeRoot: backend.activeRoot,
+        sourceRepoRoot: SOURCE_REPO_ROOT,
+        artemisHome: ARTEMIS_HOME,
+        logRoot: path.join(ARTEMIS_HOME, 'logs'),
+        abortSignal: bootstrapAbortController.signal,
+        onEvent: ev => {
+          // Tee every bootstrap event to (a) the desktop log for forensics
+          // and (b) the renderer for live progress UI. Either may be absent;
+          // tolerate both gracefully so a renderer crash doesn't stall the
+          // bootstrap and a log-write failure doesn't suppress the UI signal.
+          try {
+            rememberLog(`[bootstrap] ${JSON.stringify(ev)}`)
+          } catch {
+            void 0
+          }
+
+          try {
+            broadcastBootstrapEvent(ev)
+          } catch {
+            void 0
+          }
+        },
+        writeMarker: writeBootstrapMarker
+      })
+
+      bootstrapAbortController = null
+
+      if (bootstrapResult.cancelled) {
+        rememberLog('[bootstrap] install cancelled by user; returning to first-run setup choice')
+        // Do not latch bootstrapFailure / do not throw — cancel is intentional.
+        getFirstRunSetupGate().resetForRepair()
+        updateBootProgress(
+          {
+            error: null,
+            message: 'Waiting for first-run setup choice',
+            phase: 'bootstrap.choice',
+            progress: 12,
+            running: true
+          },
+          { allowDecrease: true }
+        )
+
+        const decision = await waitForFirstRunSetupChoice(backend)
+
+        if (decision === 'remote-applied') {
+          throw new FirstRunRemoteAppliedError()
         }
 
-        try {
-          broadcastBootstrapEvent(ev)
-        } catch {
-          void 0
+        if (decision === 'reset') {
+          throw new FirstRunSetupResetError()
         }
-      },
-      writeMarker: writeBootstrapMarker
-    })
 
-    bootstrapAbortController = null
+        // continue-local → retry the installer from the top of this loop.
+        continue
+      }
 
-    if (bootstrapResult.cancelled) {
-      const cancelledError = new Error('Artemis install was cancelled.') as any
-      cancelledError.isBootstrapFailure = true
-      cancelledError.bootstrapCancelled = true
-      bootstrapFailure = cancelledError
-      throw cancelledError
+      if (!bootstrapResult.ok) {
+        const bootstrapError = new Error(
+          `Artemis bootstrap failed${bootstrapResult.failedStage ? ` at stage '${bootstrapResult.failedStage}'` : ''}: ` +
+            `${bootstrapResult.error || 'unknown error'}. ` +
+            `Check ${path.join(ARTEMIS_HOME, 'logs', 'desktop.log')} for the full transcript.`
+        ) as any
+
+        bootstrapError.isBootstrapFailure = true
+        bootstrapError.failedStage = bootstrapResult.failedStage || null
+        // Latch the failure so subsequent startArtemis() calls return this
+        // same error without re-running install.ps1.  Cleared by the
+        // artemis:bootstrap:reset IPC (renderer's "Reload and retry").
+        bootstrapFailure = bootstrapError
+        throw bootstrapError
+      }
+
+      rememberLog('[bootstrap] bootstrap complete; marker written. Re-resolving backend.')
+
+      // Re-resolve now that the install exists. The new resolution lands in
+      // step 3 (bootstrap-complete marker) and we recurse to wire venvPython.
+      return ensureRuntime(resolveArtemisBackend(backend.args))
     }
-
-    if (!bootstrapResult.ok) {
-      const bootstrapError = new Error(
-        `Artemis bootstrap failed${bootstrapResult.failedStage ? ` at stage '${bootstrapResult.failedStage}'` : ''}: ` +
-          `${bootstrapResult.error || 'unknown error'}. ` +
-          `Check ${path.join(ARTEMIS_HOME, 'logs', 'desktop.log')} for the full transcript.`
-      ) as any
-
-      bootstrapError.isBootstrapFailure = true
-      bootstrapError.failedStage = bootstrapResult.failedStage || null
-      // Latch the failure so subsequent startArtemis() calls return this
-      // same error without re-running install.ps1.  Cleared by the
-      // artemis:bootstrap:reset IPC (renderer's "Reload and retry").
-      bootstrapFailure = bootstrapError
-      throw bootstrapError
-    }
-
-    rememberLog('[bootstrap] bootstrap complete; marker written. Re-resolving backend.')
-
-    // Re-resolve now that the install exists. The new resolution lands in
-    // step 3 (bootstrap-complete marker) and we recurse to wire venvPython.
-    return ensureRuntime(resolveArtemisBackend(backend.args))
   }
 
   // bootstrap=true with a real backend (createActiveBackend path) means we
@@ -8329,6 +8356,10 @@ async function startArtemis() {
       throw error
     }
 
+    if (error instanceof FirstRunRemoteAppliedError) {
+      throw error
+    }
+
     const message = error instanceof Error ? error.message : String(error)
 
     // Only latch LOCAL boot failures. A remote failure (lapsed session / mint
@@ -10021,7 +10052,8 @@ ipcMain.handle('artemis:bootstrap:continue-local', async () => {
 ipcMain.handle('artemis:bootstrap:cancel', async () => {
   // Renderer's Cancel button during first-launch install. Abort the running
   // install script (SIGTERM via the runner's abortSignal). runBootstrap
-  // resolves with { cancelled: true }, which surfaces the recovery overlay.
+  // resolves with { cancelled: true }. Main re-prompts the first-run choice
+  // instead of latching a boot-failure overlay.
   if (bootstrapAbortController) {
     try {
       bootstrapAbortController.abort()
