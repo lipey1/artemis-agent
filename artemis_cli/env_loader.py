@@ -758,3 +758,6 @@ def _process_artemis_home() -> Path:
         return get_artemis_home()
     except Exception:
         return Path.home() / ".artemis"
+
+
+load_hermes_dotenv = load_artemis_dotenv

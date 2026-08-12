@@ -1394,7 +1394,36 @@ EOF
         fi
     fi
 
+    validate_install_tree
+
     log_success "Repository ready"
+}
+
+validate_install_tree() {
+    # The agent runtime imports bundled plugins and gateway modules at startup
+    # (e.g. artemis_cli/web_server.py -> plugins.memory.config_schema,
+    # gateway.status). A checkout missing these trees passes venv/pip install but
+    # dies immediately on `serve`.
+    local plugins_schema="$INSTALL_DIR/plugins/memory/config_schema.py"
+    local gateway_status="$INSTALL_DIR/gateway/status.py"
+    local tools_init="$INSTALL_DIR/tools/__init__.py"
+
+    if [ ! -f "$plugins_schema" ]; then
+        log_error "Incomplete Artemis checkout: missing bundled plugins at $INSTALL_DIR/plugins"
+        log_error "Expected at least $plugins_schema"
+        log_info "Re-run the installer after updating to a release that includes plugins/,"
+        log_info "or repair with: rsync -a /path/to/artemis-desktop/plugins/ \"$INSTALL_DIR/plugins/\""
+        return 1
+    fi
+
+    if [ ! -f "$gateway_status" ] || [ ! -f "$tools_init" ]; then
+        log_error "Incomplete Artemis checkout: missing gateway/tools under $INSTALL_DIR"
+        log_error "Expected at least $gateway_status and $tools_init"
+        log_info "Re-run the installer after updating to a release that ships the full agent tree."
+        return 1
+    fi
+
+    return 0
 }
 
 setup_venv() {
@@ -3298,6 +3327,8 @@ run_stage_body() {
         complete)
             detect_os
             resolve_install_layout
+            require_install_dir
+            validate_install_tree
             print_success
             write_bootstrap_marker
             # Code-scoped stamp: write next to the install tree, not into

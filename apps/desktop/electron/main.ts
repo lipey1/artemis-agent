@@ -2059,7 +2059,12 @@ function looksLikeDesktopAppBinary(commandPath) {
 }
 
 function isArtemisSourceRoot(root) {
-  return directoryExists(root) && fileExists(path.join(root, 'artemis_cli', 'main.py'))
+  return (
+    directoryExists(root) &&
+    fileExists(path.join(root, 'artemis_cli', 'main.py')) &&
+    fileExists(path.join(root, 'plugins', 'memory', 'config_schema.py')) &&
+    fileExists(path.join(root, 'gateway', 'status.py'))
+  )
 }
 
 function findPythonForRoot(root) {

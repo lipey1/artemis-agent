@@ -1479,3 +1479,12 @@ def partial_update_hint(exc: BaseException) -> list[str]:
         "    artemis update",
         "If that also fails, reinstall: https://github.com/lipey1/artemis-desktop/releases/latest",
     ]
+
+
+# Back-compat shims for bundled gateway/tools/plugins still migrating from Hermes.
+get_hermes_home = get_artemis_home
+get_hermes_dir = get_artemis_dir
+get_default_hermes_root = get_default_artemis_root
+_get_platform_default_hermes_home = _get_platform_default_artemis_home
+set_hermes_home_override = set_artemis_home_override
+reset_hermes_home_override = reset_artemis_home_override
