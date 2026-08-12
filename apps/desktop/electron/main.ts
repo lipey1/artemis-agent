@@ -207,6 +207,7 @@ import {
   sandboxFallbackFromEnv,
   sandboxPreflight
 } from './update-relaunch'
+import { applyDebReleaseUpdate, isDebInstall } from './update-deb-install'
 import { isOfficialSshRemote, OFFICIAL_REPO_HTTPS_URL } from './update-remote'
 import {
   resolveStagedUpdaterBinary,
@@ -2537,14 +2538,22 @@ async function checkUpdates() {
   /* ARTEMIS_RELEASE_UPDATE_CHECK */
   const updateRoot = resolveUpdateRoot()
   let localVersion = ''
+  // Prefer the running app's package version (correct for /opt/Artemis .deb).
   try {
-    const pkgPath = path.join(updateRoot, 'apps', 'desktop', 'package.json')
-    localVersion = String(JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || '').replace(/^v/, '')
+    localVersion = String(app.getVersion() || '').replace(/^v/, '')
   } catch {
+    localVersion = ''
+  }
+  if (!localVersion) {
     try {
-      localVersion = String(JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')).version || '').replace(/^v/, '')
+      const pkgPath = path.join(updateRoot, 'apps', 'desktop', 'package.json')
+      localVersion = String(JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version || '').replace(/^v/, '')
     } catch {
-      localVersion = ''
+      try {
+        localVersion = String(JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')).version || '').replace(/^v/, '')
+      } catch {
+        localVersion = ''
+      }
     }
   }
 
@@ -2596,9 +2605,12 @@ async function checkUpdates() {
       artemisRoot: updateRoot,
       fetchedAt: Date.now(),
       message: behind > 0
-        ? `Artemis ${tag} is available. Download from https://github.com/lipey1/artemis-desktop/releases/latest`
+        ? IS_LINUX && isDebInstall(process.execPath, process.env)
+          ? `Artemis ${tag} is available. Click Update now to install the .deb.`
+          : `Artemis ${tag} is available. Download from https://github.com/lipey1/artemis-desktop/releases/latest`
         : undefined,
-      releaseUrl: 'https://github.com/lipey1/artemis-desktop/releases/latest'
+      releaseUrl: 'https://github.com/lipey1/artemis-desktop/releases/latest',
+      debInstall: IS_LINUX && isDebInstall(process.execPath, process.env)
     }
   } catch (error) {
     return {
@@ -3377,6 +3389,34 @@ function shellQuote(value) {
 // restart to load the new GUI" if the swap can't be performed.
 async function applyUpdatesPosixInApp(opts: any) {
   const updateRoot = resolveUpdateRoot()
+
+  // Packaged .deb under /opt/Artemis: download + pkexec install the GitHub
+  // release asset. Rebuild into linux-unpacked cannot replace this install.
+  if (IS_LINUX && isDebInstall(process.execPath, process.env)) {
+    rememberLog(`[updates] deb install path: execPath=${process.execPath}`)
+    const result = await applyDebReleaseUpdate({
+      execPath: process.execPath,
+      pid: process.pid,
+      args: collectRelaunchArgs(process.argv.slice(1)),
+      log: rememberLog,
+      onProgress: (stage, message, percent) => {
+        emitUpdateProgress({ stage, message, percent })
+      }
+    })
+    if (result.ok && result.handedOff) {
+      isQuittingForHandoff = true
+      setTimeout(() => app.quit(), UPDATE_HANDOFF_DWELL_MS)
+    }
+    if (!result.ok) {
+      emitUpdateProgress({
+        stage: 'error',
+        message: result.message || 'Update failed.',
+        error: result.error || 'update-failed'
+      })
+    }
+    return result
+  }
+
   const artemis = resolveArtemisCliBinary(updateRoot)
 
   if (!artemis) {
