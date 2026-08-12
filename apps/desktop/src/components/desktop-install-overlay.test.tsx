@@ -106,6 +106,40 @@ describe('DesktopInstallOverlay first-run setup', () => {
     expect(screen.queryByText(/Fetching installer manifest/i)).toBeNull()
   })
 
+  it('re-enables the local install choice after cancel returns to setup-choice', async () => {
+    const desktop = installDesktopMock(
+      bootstrapState({
+        setupChoice: { platform: 'linux', activeRoot: '/home/me/.artemis/artemis-agent' }
+      })
+    )
+
+    render(<DesktopInstallOverlay />)
+
+    const install = (await screen.findByText('Install Artemis locally')).closest('button') as HTMLButtonElement
+    fireEvent.click(install)
+    expect(install.disabled).toBe(true)
+
+    act(() => {
+      desktop.emitBootstrapEvent({ type: 'manifest', protocolVersion: 1, stages: [{ name: 'repository' }] })
+    })
+
+    await waitFor(() => expect(screen.queryByText('Set up Artemis Desktop')).toBeNull())
+
+    act(() => {
+      desktop.emitBootstrapEvent({
+        type: 'setup-choice',
+        active: true,
+        platform: 'linux',
+        activeRoot: '/home/me/.artemis/artemis-agent'
+      })
+    })
+
+    const installAgain = (await screen.findByText('Install Artemis locally')).closest('button') as HTMLButtonElement
+    expect(installAgain.disabled).toBe(false)
+    expect(installAgain.querySelector('.animate-spin')).toBeNull()
+    expect(screen.getByText('Connect to existing Artemis').closest('button')?.disabled).toBe(false)
+  })
+
   it('continues local bootstrap only when Install Artemis locally is selected', async () => {
     const desktop = installDesktopMock(
       bootstrapState({

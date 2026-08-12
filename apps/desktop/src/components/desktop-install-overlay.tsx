@@ -320,21 +320,27 @@ export function DesktopInstallOverlay({ enabled = true }: DesktopInstallOverlayP
         // stays empty, app falls through to existing onboarding flow.
       })
 
-    const off = desktop.onBootstrapEvent(ev => setState(prev => applyEvent(prev, ev)))
+    const off = desktop.onBootstrapEvent(ev => {
+      setState(prev => applyEvent(prev, ev))
+
+      // Main re-prompts setup-choice after a soft cancel. Clear transient UI
+      // latches (local-start spinner, cancel-in-flight) so both choice buttons
+      // are clickable again without a reload.
+      if (ev.type === 'setup-choice' && ev.active) {
+        setCancelling(false)
+        setLocalStart({ root: null, starting: false, error: null })
+      }
+
+      if (ev.type === 'manifest') {
+        setLocalStart({ root: null, starting: false, error: null })
+      }
+    })
 
     return () => {
       cancelled = true
       off?.()
     }
   }, [enabled])
-
-  // Soft cancel returns to setup-choice while cancelling=true; clear it so a
-  // subsequent local install shows an enabled Cancel button again.
-  useEffect(() => {
-    if (state.setupChoice) {
-      setCancelling(false)
-    }
-  }, [state.setupChoice])
 
   // Autoscroll log to bottom when new lines arrive AND the log is open
   useEffect(() => {

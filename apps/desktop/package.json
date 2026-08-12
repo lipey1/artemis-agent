@@ -2,7 +2,7 @@
   "name": "artemis",
   "productName": "Artemis",
   "private": true,
-  "version": "0.17.10",
+  "version": "0.17.11",
   "description": "Artemis Desktop - native shell for the Artemis agent.",
   "author": "Artemis / lipey1",
   "type": "module",
