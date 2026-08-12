@@ -5,7 +5,7 @@ Provides PID-file based detection of whether the gateway daemon is running,
 used by send_message's check_fn to gate availability in the CLI.
 
 The PID file lives at ``{ARTEMIS_HOME}/gateway.pid``.  ARTEMIS_HOME defaults to
-``~/.hermes`` but can be overridden via the environment variable.  This means
+``~/.artemis`` but can be overridden via the environment variable.  This means
 separate ARTEMIS_HOME directories naturally get separate PID files — a property
 that will be useful when we add named profiles (multiple agents running
 concurrently under distinct configurations).
@@ -25,7 +25,7 @@ import time
 from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
-from artemis_constants import get_artemis_home, _get_platform_default_hermes_home
+from artemis_constants import get_artemis_home, _get_platform_default_artemis_home
 from typing import Any, Callable, NamedTuple, Optional
 from utils import atomic_json_write
 
@@ -141,7 +141,7 @@ def _get_process_hermes_home() -> Path:
     val = os.environ.get("ARTEMIS_HOME", "").strip()
     if val:
         return Path(val)
-    return _get_platform_default_hermes_home()
+    return _get_platform_default_artemis_home()
 
 
 def _canonical_hermes_home(path: Path | str) -> Path:
