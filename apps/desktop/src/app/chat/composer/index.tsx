@@ -1181,21 +1181,19 @@ export function ChatBar({
               {hudMode && busy && <span aria-hidden className="arc-border arc-composer" />}
               <div
                 className={cn(
-                  'group/composer-surface relative z-4 isolate grid grid-rows-[auto_1fr] overflow-hidden rounded-[inherit] border border-[color-mix(in_srgb,var(--dt-composer-ring)_calc(18%*var(--composer-ring-strength)),var(--dt-input))]',
+                  // Fill + glass live on THIS node (not a -z child). A CSS border on a
+                  // transparent host over backdrop-filter paints broken dark dashes along
+                  // the rounded bottom edge on Linux/Wayland; the ring is a box-shadow in
+                  // styles.css on [data-slot='composer-surface'] so it anti-aliases cleanly.
+                  'group/composer-surface relative z-4 isolate grid grid-rows-[auto_1fr] overflow-hidden rounded-[inherit]',
+                  composerFill,
+                  composerSurfaceGlass,
                   COMPOSER_DROP_FADE_CLASS,
                   dragActive && COMPOSER_DROP_ACTIVE_CLASS
                 )}
                 data-slot="composer-surface"
                 ref={composerSurfaceRef}
               >
-                <div
-                  aria-hidden
-                  className={cn(
-                    'pointer-events-none absolute inset-0 -z-10 rounded-[inherit]',
-                    composerFill,
-                    composerSurfaceGlass
-                  )}
-                />
                 <CodingStatusRow
                   onBranchOff={handleBranchOff}
                   onConvertBranch={handleConvertBranch}
@@ -1302,16 +1300,14 @@ export function ChatBarFallback() {
       )}
       data-slot="composer-root"
     >
-      <div className="composer-fallback-surface relative isolate h-(--composer-fallback-height) w-full rounded-[inherit] border border-[color-mix(in_srgb,var(--dt-composer-ring)_calc(18%*var(--composer-ring-strength)),var(--dt-input))]">
-        <div
-          aria-hidden
-          className={cn(
-            'pointer-events-none absolute inset-0 -z-10 rounded-[inherit]',
-            composerFill,
-            composerSurfaceGlass
-          )}
-        />
-      </div>
+      <div
+        className={cn(
+          'composer-fallback-surface relative isolate h-(--composer-fallback-height) w-full rounded-[inherit]',
+          composerFill,
+          composerSurfaceGlass,
+          'shadow-[0_0_0_1px_color-mix(in_srgb,var(--dt-composer-ring)_calc(18%*var(--composer-ring-strength)),var(--dt-input))]'
+        )}
+      />
     </div>
   )
 }

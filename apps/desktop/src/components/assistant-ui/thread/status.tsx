@@ -8,8 +8,8 @@ import { useElapsedSeconds } from '@/components/chat/activity-timer'
 import { ActivityTimerText } from '@/components/chat/activity-timer-text'
 import { SCAFFOLD_LABEL_CLASS } from '@/components/chat/scaffold-row'
 import { Codicon } from '@/components/ui/codicon'
+import { GlyphSpinner } from '@/components/ui/glyph-spinner'
 import { Loader } from '@/components/ui/loader'
-import { StatusPulse } from '@/components/ui/status-pulse'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { $backgroundResume } from '@/store/background-delegation'
@@ -131,10 +131,10 @@ export const ResponseLoadingIndicator: FC = () => {
 
   return (
     <StatusRow data-slot="aui_response-loading" label={hint || t.assistant.thread.loadingResponse}>
-      <StatusPulse
-        aria-hidden="true"
-        className="dither inline-block size-3 rounded-[2px] text-midground/80"
-        kind="opacity"
+      <GlyphSpinner
+        ariaLabel={hint || t.assistant.thread.loadingResponse}
+        className="text-[0.85rem] leading-none text-midground/80"
+        spinner="braille"
       />
       {hint && <HintText>{hint}</HintText>}
       <ActivityTimerText seconds={elapsed} />
@@ -180,7 +180,7 @@ const STREAM_STALL_S = 2
 // text flows, but if the stream then goes quiet mid-turn (tool think-time,
 // provider stall) nothing signals that work continues. Watch a per-flush
 // activity signal; when it hasn't changed for STREAM_STALL_S, re-show the
-// dither + a timer counting from the last activity.
+// spinner + a timer counting from the last activity.
 //
 // Subscribes to the activity signal ITSELF (rather than taking it as a prop)
 // so that per-token updates re-render only this leaf, not the whole
@@ -241,10 +241,10 @@ export const StreamStallIndicator: FC = () => {
 
   return (
     <StatusRow data-slot="aui_stream-stall" label={hint || 'Artemis is thinking'}>
-      <StatusPulse
-        aria-hidden="true"
-        className="dither inline-block size-3 rounded-[2px] text-midground/80"
-        kind="opacity"
+      <GlyphSpinner
+        ariaLabel={hint || 'Artemis is thinking'}
+        className="text-[0.85rem] leading-none text-midground/80"
+        spinner="braille"
       />
       {hint && <HintText>{hint}</HintText>}
       <ActivityTimerText seconds={elapsed} />

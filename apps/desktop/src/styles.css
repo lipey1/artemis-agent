@@ -1506,7 +1506,10 @@ body.guest-pointer-lock :is(webview, iframe) {
 }
 
 [data-slot='composer-surface'] {
-  border-color: var(--ui-stroke-secondary) !important;
+  /* Ring via box-shadow, not border: a CSS border on a translucent rounded
+     surface paints broken dark dashes on Linux/Wayland (Chromium AA). */
+  border-color: transparent !important;
+  box-shadow: 0 0 0 1px var(--ui-stroke-secondary);
 }
 
 [data-slot='composer-fade'] {
@@ -2796,10 +2799,8 @@ button[data-slot='aui_msg-reactions'] svg {
   width: 100% !important;
 }
 
-/* The composer surface paints TWO layers: the surface itself, plus an
-   `absolute inset-0 -z-10` fill+glass div behind it (composerFill /
-   composerSurfaceGlass). Two stacked fills read as a box inside a box, so the
-   backing layer goes and the surface carries the single fill. */
+/* The composer surface paints fill+glass on itself (not a -z child). HUD forces
+   an opaque card fill and drops the glass blur so the Spotlight bar stays solid. */
 [data-hud-shell] [data-slot='composer-surface'] > .pointer-events-none.absolute.inset-0 {
   display: none !important;
 }
@@ -2813,7 +2814,7 @@ button[data-slot='aui_msg-reactions'] svg {
    breathing belongs to the thread and the chat surface; the bar just sits
    there, solid, like Spotlight does. */
 [data-hud-shell] [data-slot='composer-surface'] {
-  border: 1px solid var(--ui-stroke-secondary) !important;
+  border: 0 !important;
   /* Same radius as the band's top and the window's own corners, so the HUD
      reads as one object however the band is behaving. Its top corners let a
      sliver of band through, which is the point — the glass wraps the bar's
@@ -2822,20 +2823,25 @@ button[data-slot='aui_msg-reactions'] svg {
   background: var(--dt-card) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  /* Bottom edge only. Enough to lift the bar off whatever it is lying over —
-     without it the HUD reads as pasted onto the other app — and tight enough
-     that it never becomes a glow around a floating card. */
-  box-shadow: 0 2px 2px -1px rgb(0 0 0 / 0.12) !important;
-  transition: border-color var(--hud-reveal) var(--hud-ease-enter);
+  /* Bottom edge only. Enough to lift the bar off whatever it is lying over -
+     without it the HUD reads as pasted onto the other app - and tight enough
+     that it never becomes a glow around a floating card. Ring is the first
+     shadow so the surface edge stays crisp (no border AA dashes). */
+  box-shadow:
+    0 0 0 1px var(--ui-stroke-secondary),
+    0 2px 2px -1px rgb(0 0 0 / 0.12) !important;
+  transition: box-shadow var(--hud-reveal) var(--hud-ease-enter);
 }
 
-/* Focus: the border the bar already has, in the accent. Everything with its own
-   geometry is out — the bar sits flush against the window, so a ring or a
+/* Focus: the ring the bar already has, in the accent. Everything with its own
+   geometry is out - the bar sits flush against the window, so a ring or a
    shadow is sawn off by the window before any CSS can shape it, and paying for
    the clearance moves the bar. Recolouring what is already drawn costs no
    space, cannot be clipped, and leaves the working arc as the only ring. */
 [data-hud-shell]:has([data-slot='composer-rich-input']:focus) [data-slot='composer-surface'] {
-  border-color: var(--dt-primary) !important;
+  box-shadow:
+    0 0 0 1px var(--dt-primary),
+    0 2px 2px -1px rgb(0 0 0 / 0.12) !important;
 }
 
 /* Long-press drag armed — the whole bar is the handle until release. */

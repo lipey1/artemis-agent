@@ -13,7 +13,7 @@ export function ActivityTimerText({ seconds, className }: ActivityTimerTextProps
     <StableText
       className={cn(
         // Tinted with --dt-midground (very low alpha) so the timer reads
-        // as part of the same "live signal" cluster as the dither block /
+        // as part of the same "live signal" cluster as the spinner /
         // arc-border / working-session dot, instead of being neutral chrome.
         'shrink-0 text-[0.56rem] leading-none tracking-[0.02em] text-midground/55',
         className
