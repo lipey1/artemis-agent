@@ -11,7 +11,7 @@ export function BrandMark({ className, ...props }: React.ComponentProps<'span'>)
   return (
     <span
       className={cn(
-        'inline-flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-transparent text-[0.64rem] font-semibold tracking-[0.16em] text-foreground',
+        'inline-flex aspect-square size-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-transparent text-[0.64rem] font-semibold tracking-[0.16em] text-foreground',
         className
       )}
       {...props}
@@ -21,7 +21,7 @@ export function BrandMark({ className, ...props }: React.ComponentProps<'span'>)
       ) : (
         <img
           alt="Artemis"
-          className="size-full object-cover"
+          className="size-full object-contain"
           onError={() => setBroken(true)}
           src={assetPath('artemis.png')}
         />

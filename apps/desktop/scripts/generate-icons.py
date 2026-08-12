@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Regenerate Artemis app icons with squircle-clipped transparent corners.
 
-Loads square master artwork, removes black/beige letterboxing, crops to a
-centered square, resizes full-bleed, and clips to a superellipse so corner
-pixels are transparent (never black or beige squares).
+Loads square master artwork, keeps a 1:1 canvas with centered artwork, and
+clips to a superellipse so corner pixels are transparent (never black squares).
 
 Source: assets/artemis-source.png (square master; bootstrapped from public/artemis.png)
 Outputs: assets/icon.png, assets/linux-icons/*, public/artemis.png,
@@ -46,108 +45,24 @@ def _is_black(p: tuple[int, ...], threshold: int = 40) -> bool:
     return p[3] > 200 and p[0] < threshold and p[1] < threshold and p[2] < threshold
 
 
-def _is_beige(p: tuple[int, ...], tolerance: int = 35) -> bool:
-    return (
-        p[3] > 200
-        and abs(int(p[0]) - BEIGE[0]) < tolerance
-        and abs(int(p[1]) - BEIGE[1]) < tolerance
-        and abs(int(p[2]) - BEIGE[2]) < tolerance
-    )
-
-
-def _is_background(p: tuple[int, ...]) -> bool:
-    return p[3] < 128 or _is_black(p) or _is_beige(p)
-
-
-def _column_black_ratio(px, w: int, h: int, x: int, y0: int, y1: int) -> float:
-    total = y1 - y0
-    if total <= 0:
-        return 0.0
-    black = sum(1 for y in range(y0, y1) if _is_black(px[x, y]))
-    return black / total
-
-
-def _row_beige_ratio(px, w: int, y: int) -> float:
-    beige = sum(1 for x in range(w) if _is_beige(px[x, y]))
-    return beige / w
-
-
 def prepare_source(img: Image.Image) -> Image.Image:
-    """Crop letterboxing and pillarboxing, then center on a square canvas."""
+    """Ensure a square RGBA canvas; replace pure black with transparent.
+
+    Do not crop letterboxing or pillarboxing. The master artwork is already
+    square; aggressive cropping produced wide, short icons in 0.17.10+.
+    """
     rgba = img.convert('RGBA')
     w, h = rgba.size
-    px = rgba.load()
 
-    y0, y1 = h // 4, (3 * h) // 4
-
-    # Strip black pillarboxing from left/right.
-    left = 0
-    while left < w and _column_black_ratio(px, w, h, left, y0, y1) > 0.8:
-        left += 1
-    right = w - 1
-    while right >= left and _column_black_ratio(px, w, h, right, y0, y1) > 0.8:
-        right -= 1
-
-    cropped = rgba.crop((left, 0, right + 1, h)) if right >= left else rgba
-    w, h = cropped.size
-    px = cropped.load()
-
-    # Strip uniform beige letterboxing from top/bottom.
-    top = 0
-    for y in range(h):
-        if _row_beige_ratio(px, w, y) < 0.85:
-            top = y
-            break
-    bottom = h - 1
-    for y in range(h - 1, -1, -1):
-        if _row_beige_ratio(px, w, y) < 0.85:
-            bottom = y
-            break
-
-    cropped = cropped.crop((0, top, w, bottom + 1))
-    w, h = cropped.size
-    px = cropped.load()
-
-    # Foreground bbox (artwork + parchment, excluding outer black/beige pads).
-    minx, miny, maxx, maxy = w, h, -1, -1
-    for y in range(h):
-        for x in range(w):
-            if not _is_background(px[x, y]):
-                minx = min(minx, x)
-                miny = min(miny, y)
-                maxx = max(maxx, x)
-                maxy = max(maxy, y)
-
-    if maxx < 0:
-        return cropped
-
-    cx = (minx + maxx) // 2
-    cy = (miny + maxy) // 2
-    side = max(maxx - minx + 1, maxy - miny + 1)
-
-    # Expand slightly so engraving lines near the edge are not clipped.
-    side = min(max(w, h), int(side * 1.02))
-
-    x0 = max(0, cx - side // 2)
-    y0 = max(0, cy - side // 2)
-    x1 = min(w, x0 + side)
-    y1 = min(h, y0 + side)
-    x0 = max(0, x1 - side)
-    y0 = max(0, y1 - side)
-
-    square = cropped.crop((x0, y0, x1, y1))
-
-    # Pad to a perfect square when the crop hit an image edge.
-    if square.size[0] != square.size[1]:
-        side = max(square.size)
+    if w != h:
+        side = max(w, h)
         canvas = Image.new('RGBA', (side, side), (0, 0, 0, 0))
-        ox = (side - square.size[0]) // 2
-        oy = (side - square.size[1]) // 2
-        canvas.paste(square, (ox, oy), square)
-        square = canvas
+        ox = (side - w) // 2
+        oy = (side - h) // 2
+        canvas.paste(rgba, (ox, oy), rgba)
+        rgba = canvas
 
-    # Replace any remaining black background pixels with transparent.
-    out = square.copy()
+    out = rgba.copy()
     opx = out.load()
     ow, oh = out.size
     for y in range(oh):
@@ -197,6 +112,9 @@ def verify_corners(img: Image.Image, label: str) -> list[str]:
     """Return list of verification errors."""
     errors: list[str] = []
     w, h = img.size
+
+    if w != h:
+        errors.append(f'{label}: not square ({w}x{h})')
 
     for x, y in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)):
         px = img.getpixel((x, y))
@@ -250,6 +168,35 @@ def verify_no_black_bars(img: Image.Image, label: str) -> list[str]:
     return errors
 
 
+def verify_square_content(img: Image.Image, label: str, max_ratio_delta: float = 0.08) -> list[str]:
+    """Opaque bbox should be roughly square, not a wide rectangle."""
+    errors: list[str] = []
+    bbox = img.getbbox()
+    if not bbox:
+        errors.append(f'{label}: fully transparent image')
+        return errors
+
+    bw = bbox[2] - bbox[0]
+    bh = bbox[3] - bbox[1]
+    if bw <= 0 or bh <= 0:
+        errors.append(f'{label}: empty opaque bbox {bbox}')
+        return errors
+
+    ratio = bw / bh
+    if abs(ratio - 1.0) > max_ratio_delta:
+        errors.append(f'{label}: opaque bbox {bbox} ratio={ratio:.3f}, expected ~1.0')
+    return errors
+
+
+def verify_center_opaque(img: Image.Image, label: str) -> list[str]:
+    errors: list[str] = []
+    w, h = img.size
+    px = img.getpixel((w // 2, h // 2))
+    if px[3] == 0:
+        errors.append(f'{label}: center pixel transparent rgba={px}')
+    return errors
+
+
 def main() -> int:
     source_path = ensure_source()
     raw = Image.open(source_path).convert('RGBA')
@@ -274,6 +221,9 @@ def main() -> int:
         icon = generate_icon(source, size)
         icon.save(out, 'PNG')
         all_errors.extend(verify_corners(icon, f'{size}x{size}'))
+        all_errors.extend(verify_center_opaque(icon, f'{size}x{size}'))
+        if size in (48, 256, 1024):
+            all_errors.extend(verify_square_content(icon, f'{size}x{size}'))
         if size == 256:
             all_errors.extend(verify_no_black_bars(icon, f'{size}x{size}'))
         print(f'Wrote {out}')
@@ -281,10 +231,13 @@ def main() -> int:
     apple = generate_icon(source, 180)
     apple.save(ROOT / 'public' / 'apple-touch-icon.png', 'PNG')
     all_errors.extend(verify_corners(apple, '180 apple-touch'))
+    all_errors.extend(verify_center_opaque(apple, '180 apple-touch'))
     print(f'Wrote {ROOT / "public" / "apple-touch-icon.png"}')
 
-    all_errors.extend(verify_corners(generate_icon(source, 48), '48 verify'))
-    all_errors.extend(verify_no_black_bars(generate_icon(source, 256), '256 verify'))
+    all_errors.extend(verify_corners(master, '1024 master'))
+    all_errors.extend(verify_square_content(master, '1024 master'))
+    all_errors.extend(verify_no_black_bars(master, '1024 master'))
+    all_errors.extend(verify_center_opaque(master, '1024 master'))
 
     if all_errors:
         print('\nVERIFICATION FAILED:', file=sys.stderr)
@@ -292,7 +245,7 @@ def main() -> int:
             print(f'  - {err}', file=sys.stderr)
         return 1
 
-    print('\nVerification passed: transparent squircle corners, no black pillarboxing.')
+    print('\nVerification passed: square squircle icons, transparent corners, no black pillarboxing.')
 
     icon_png = OUT_DIR / 'icon.png'
     subprocess.run(
