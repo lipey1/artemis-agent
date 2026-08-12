@@ -1,30 +1,35 @@
 /**
  * after-pack.mjs — electron-builder afterPack hook.
  *
- * Stamps the Artemis icon + identity onto the packed Windows Artemis.exe via
- * rcedit (delegated to set-exe-identity.mjs). This runs for EVERY packed build
- * — first install, `artemis desktop`, the installer's --update rebuild, and a
- * dev's manual `npm run pack` — so the branded exe can never silently revert
- * to the stock "Electron" icon/name (the bug when the stamp lived only in
- * install.ps1, which the update path doesn't use).
+ * Windows: stamps the Artemis icon + identity onto Artemis.exe via rcedit.
+ * Linux: marks chrome-sandbox mode 4755 in the unpacked tree so the bit is
+ * present before fpm packs the .deb (after-install.sh re-applies as root).
  *
- * Windows-only: rcedit edits PE resources, irrelevant on macOS/Linux where the
- * app identity comes from the bundle Info.plist / desktop entry. Best-effort:
- * a stamp failure must never fail an otherwise-good build (worst case is the
- * stock icon, not a broken app), so we log and resolve rather than throw.
- *
- * electron-builder passes a context with:
- *   - electronPlatformName: 'win32' | 'darwin' | 'linux'
- *   - appOutDir:            the unpacked app directory for this target
- *   - packager.appInfo.productFilename: the exe basename (e.g. 'Artemis')
+ * Best-effort: failures here must never fail an otherwise-good build.
  */
 
+import fs from 'node:fs'
 import path from 'node:path'
 
 import { stampExeIdentity } from './set-exe-identity.mjs'
 
 export default async function afterPack(context) {
-  if (context.electronPlatformName !== 'win32') {
+  const platform = context.electronPlatformName
+
+  if (platform === 'linux') {
+    const sandbox = path.join(context.appOutDir, 'chrome-sandbox')
+    try {
+      if (fs.existsSync(sandbox)) {
+        fs.chmodSync(sandbox, 0o4755)
+        console.log(`[after-pack] set ${sandbox} mode 4755`)
+      }
+    } catch (err) {
+      console.warn(`[after-pack] chrome-sandbox chmod failed (${err.message})`)
+    }
+    return
+  }
+
+  if (platform !== 'win32') {
     return
   }
 
