@@ -36,17 +36,27 @@ function electronBuilderCli() {
   return path.join(path.dirname(pkgJson), rel)
 }
 
+const extraArgs = process.argv.slice(2).filter((arg) => arg !== "--")
+const crossPack = extraArgs.some(
+  (arg) => arg === "--win" || arg === "--mac" || arg.startsWith("--win=") || arg.startsWith("--mac=")
+)
+
 const dist = electronDistDir()
 const args = []
-if (dist && fs.existsSync(distBinary(dist))) {
+if (!crossPack && dist && fs.existsSync(distBinary(dist))) {
   args.push(`-c.electronDist=${dist}`)
+} else if (crossPack) {
+  console.warn(
+    "[run-electron-builder] skipping host electronDist for cross-pack; " +
+      "electron-builder will fetch the target Electron via @electron/get."
+  )
 } else {
   console.warn(
     "[run-electron-builder] no local electron dist; electron-builder will fetch " +
       "via @electron/get (electronVersion + ELECTRON_MIRROR)."
   )
 }
-args.push(...process.argv.slice(2))
+args.push(...extraArgs)
 
 const result = spawnSync(process.execPath, [electronBuilderCli(), ...args], {
   stdio: "inherit",
