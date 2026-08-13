@@ -317,7 +317,8 @@ def uninstall_gateway_service():
 #      HKCU\Environment.
 #   2. Prepends to User-scope ``PATH`` (same registry location) entries
 #      like ``%LOCALAPPDATA%\artemis\git\cmd``, ``%LOCALAPPDATA%\artemis\git\bin``,
-#      ``%LOCALAPPDATA%\artemis\git\usr\bin``, ``%LOCALAPPDATA%\artemis\node``.
+#      ``%LOCALAPPDATA%\artemis\git\usr\bin``, ``%LOCALAPPDATA%\artemis\node``,
+#      ``%LOCALAPPDATA%\artemis\bin`` (CLI shim ``artemis.cmd``).
 #      Again not in any rc file — only accessible via the registry or the
 #      .NET [Environment] API.
 #   3. Downloads PortableGit to ``%LOCALAPPDATA%\artemis\git\`` and Node to
@@ -341,7 +342,13 @@ def _artemis_path_markers(artemis_home: Path) -> list[str]:
     root = str(artemis_home).rstrip("\\/")
     # Match on prefix so sub-entries (git\cmd, git\bin, git\usr\bin, node, etc.)
     # all get swept.  Also match the bare artemis-agent install dir.
-    markers = [root + "\\artemis-agent", root + "\\git", root + "\\node", root + "\\venv"]
+    markers = [
+        root + "\\artemis-agent",
+        root + "\\git",
+        root + "\\node",
+        root + "\\venv",
+        root + "\\bin",
+    ]
     # Also match if ARTEMIS_HOME was customised to somewhere else — find-and-nuke
     # any entry whose path component contains "artemis".  We don't want to catch
     # unrelated entries like "cartemis-foo" or "ephermeral", so we look for

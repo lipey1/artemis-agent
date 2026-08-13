@@ -66,6 +66,7 @@ from artemis_cli.config import (
     get_env_path,
     get_artemis_home,
     get_process_artemis_home,
+    get_env_value,
     load_config,
     load_env,
     read_raw_config,
@@ -7603,6 +7604,53 @@ def delete_custom_endpoint(endpoint_id: str, profile: Optional[str] = None):
         raise HTTPException(status_code=500, detail="Failed to delete custom endpoint")
 
 
+def _expand_env_ref_token(raw: str) -> str:
+    """Resolve a lone ``${VAR}`` token to its env value; otherwise return *raw*."""
+    text = (raw or "").strip()
+    match = re.fullmatch(r"\$\{([^}]+)\}", text)
+    if not match:
+        return text
+    return (get_env_value(match.group(1)) or "").strip()
+
+
+def _resolve_custom_endpoint_probe_key(body: CustomEndpointUpdate) -> str:
+    """API key to send on a custom-endpoint validate probe.
+
+    The Settings form clears the password field when editing ("Leave blank to
+    keep current key"). Probing without Authorization then returns 401 from
+    auth-gated proxies and was misreported as "The endpoint rejected the API
+    key" even while Active + green check proved the stored key works. Resolve
+    the stored ``key_env`` / ``ARTEMIS_CUSTOM_*`` / plaintext ``api_key`` when
+    the form did not submit a new value. Also expand a pasted ``${VAR}`` so a
+    template is never sent as the Bearer token.
+    """
+    submitted = body.api_key.strip() if isinstance(body.api_key, str) else ""
+    if submitted:
+        return _expand_env_ref_token(submitted)
+
+    endpoint_id = _custom_endpoint_id(body.id or body.name or "")
+    if not endpoint_id:
+        return ""
+
+    dedicated = custom_endpoint_key_env(endpoint_id)
+    stored = (get_env_value(dedicated) or "").strip()
+    if stored:
+        return stored
+
+    providers = read_raw_config().get("providers")
+    entry = providers.get(endpoint_id) if isinstance(providers, dict) else None
+    if not isinstance(entry, dict):
+        return ""
+
+    key_env = str(entry.get("key_env") or entry.get("api_key_env") or "").strip()
+    if key_env:
+        stored = (get_env_value(key_env) or "").strip()
+        if stored:
+            return stored
+
+    return _expand_env_ref_token(str(entry.get("api_key") or ""))
+
+
 @app.post("/api/providers/custom-endpoints/validate")
 async def validate_custom_endpoint(body: CustomEndpointUpdate):
     """Probe a custom endpoint by calling its OpenAI-compatible /models URL."""
@@ -7613,9 +7661,10 @@ async def validate_custom_endpoint(body: CustomEndpointUpdate):
         return {"ok": False, "reachable": True, "message": "Enter an endpoint URL first.", "models": []}
 
     url = base_url + "/models"
+    api_key = _resolve_custom_endpoint_probe_key(body)
     headers = {"Accept": "application/json"}
-    if body.api_key and body.api_key.strip():
-        headers["Authorization"] = f"Bearer {body.api_key.strip()}"
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
 
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(8.0)) as client:
@@ -7624,6 +7673,13 @@ async def validate_custom_endpoint(body: CustomEndpointUpdate):
         return {"ok": False, "reachable": False, "message": f"Could not reach {url}.", "models": []}
 
     if resp.status_code in (401, 403):
+        if not api_key:
+            return {
+                "ok": False,
+                "reachable": True,
+                "message": "The endpoint requires an API key.",
+                "models": [],
+            }
         return {"ok": False, "reachable": True, "message": "The endpoint rejected the API key.", "models": []}
     if not resp.is_success:
         return {"ok": False, "reachable": True, "message": f"Endpoint returned HTTP {resp.status_code}.", "models": []}

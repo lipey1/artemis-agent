@@ -226,6 +226,7 @@ def _augment_path_with_known_tools() -> None:
     # should match so this prefill fully mirrors what a fresh shell would
     # see on next launch.
     candidate_dirs = [
+        os.path.join(local_appdata, "artemis", "bin"),
         os.path.join(local_appdata, "artemis", "git", "cmd"),
         os.path.join(local_appdata, "artemis", "git", "bin"),
         os.path.join(local_appdata, "artemis", "git", "usr", "bin"),

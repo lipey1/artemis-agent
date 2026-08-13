@@ -350,7 +350,7 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
               view={providerView}
             />
           ) : activeView === 'keys' ? (
-            <KeysSettings view={keysView} />
+            <KeysSettings onConfigSaved={onConfigSaved} view={keysView} />
           ) : activeView === 'notifications' ? (
             <NotificationsSettings />
           ) : activeView === 'plugins' ? (

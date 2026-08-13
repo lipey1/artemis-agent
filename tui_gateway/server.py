@@ -2126,6 +2126,39 @@ def _wait_agent_for_prompt(session: dict, rid: str, sid: str) -> dict | None:
     return _err(rid, 5032, err) if err else None
 
 
+def _clear_sticky_agent_init_failure(session: dict) -> bool:
+    """Reset a failed deferred agent build so the next start can retry.
+
+    A failed ``_start_agent_build`` sets ``agent_error`` and signals
+    ``agent_ready`` without creating an agent. The build gate then refuses to
+    restart (``ready.is_set()`` / ``agent_build_started``), so every later
+    ``prompt.submit`` on that session re-emits the stale failure forever — even
+    after the user fixes providers/API keys. New chats work because they mint a
+    fresh session; the broken one stays dead until restart.
+
+    Returns True when a sticky failure was cleared.
+    """
+    if session.get("agent") is not None:
+        return False
+    if not session.get("agent_error"):
+        return False
+    session["agent_error"] = None
+    session["agent_build_started"] = False
+    session.pop("_agent_build_thread", None)
+    session["agent_ready"] = threading.Event()
+    return True
+
+
+def _clear_sticky_agent_init_failures() -> int:
+    """Clear sticky init failures across live sessions. Returns count cleared."""
+    cleared = 0
+    with _sessions_lock:
+        for session in list(_sessions.values()):
+            if _clear_sticky_agent_init_failure(session):
+                cleared += 1
+    return cleared
+
+
 def _start_agent_build(sid: str, session: dict) -> None:
     """Start building the real AIAgent for a TUI session, once.
 
@@ -2139,6 +2172,20 @@ def _start_agent_build(sid: str, session: dict) -> None:
     ready = session.get("agent_ready")
     if ready is None:
         return
+    # Sticky failure recovery: a prior build set agent_error and signalled
+    # ready without an agent. Clear it and allow a fresh build so fixing
+    # providers/API keys lets the SAME chat send again (not only a new chat).
+    if session.get("agent") is None and session.get("agent_error"):
+        try:
+            from artemis_cli.config import reload_env
+
+            reload_env()
+        except Exception:
+            logger.debug("reload_env before agent rebuild failed", exc_info=True)
+        _clear_sticky_agent_init_failure(session)
+        ready = session.get("agent_ready")
+        if ready is None:
+            return
     # A lazy watch session spectating an in-flight child must stay lazy so the
     # subagent live-mirror keeps flowing. Incidental RPCs (session.info, model
     # metadata, etc.) resolve through _sess(), which would otherwise upgrade it

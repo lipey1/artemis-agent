@@ -259,6 +259,7 @@ import {
   writeSandboxMarker
 } from './windows-sandbox-fallback'
 import { installWindowsSystemCaTrust } from './windows-system-ca'
+import { ensureWindowsCliPathEntry } from './windows-cli-path'
 import { readWindowsUserEnvVar } from './windows-user-env'
 import { isPackagedInstallPath as isPackagedInstallPathUnderRoots } from './workspace-cwd'
 import { readWslWindowsClipboardImage } from './wsl-clipboard-image'
@@ -3783,6 +3784,18 @@ function writeBootstrapMarker(payload) {
 /** Put `artemis` on PATH (user-local) after Desktop install / first-run. */
 function ensureCliPathEntry() {
   if (process.platform === 'win32') {
+    // NSIS installs the GUI only (Start Menu -> Artemis.exe). Mirror Linux's
+    // after-install.sh CLI step: drop artemis.cmd into %LOCALAPPDATA%\artemis\bin
+    // and ensure that directory is on the User PATH so `artemis model` works.
+    ensureWindowsCliPathEntry({
+      srcCandidates: [
+        process.resourcesPath ? path.join(process.resourcesPath, 'artemis.cmd') : '',
+        path.join(SOURCE_REPO_ROOT, 'scripts', 'artemis.cmd')
+      ].filter(Boolean),
+      env: process.env,
+      fileExists,
+      log: rememberLog
+    })
     return
   }
 

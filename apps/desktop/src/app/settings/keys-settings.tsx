@@ -28,9 +28,9 @@ const VIEW_CATEGORIES: Record<KeysView, readonly string[]> = {
   tools: ['tool']
 }
 
-export function KeysSettings({ view }: KeysSettingsProps) {
+export function KeysSettings({ onConfigSaved, view }: KeysSettingsProps) {
   const { t } = useI18n()
-  const { rowProps, vars } = useEnvCredentials()
+  const { rowProps, vars } = useEnvCredentials({ onSaved: onConfigSaved })
   const [openKey, setOpenKey] = useState<null | string>(null)
 
   useEffect(() => {
@@ -104,5 +104,6 @@ export function KeysSettings({ view }: KeysSettingsProps) {
 }
 
 interface KeysSettingsProps {
+  onConfigSaved?: () => void
   view: KeysView
 }

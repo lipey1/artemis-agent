@@ -126,7 +126,7 @@ function LocalEndpointRow({ onOpen }: { onOpen: (reason: null | string) => void 
 
 export function ProvidersSettings({ onConfigSaved, onMainModelChanged, view }: ProvidersSettingsProps) {
   const { t } = useI18n()
-  const { rowProps, vars } = useEnvCredentials()
+  const { rowProps, vars } = useEnvCredentials({ onSaved: onConfigSaved })
   const [openProvider, setOpenProvider] = useState<null | string>(null)
   const [keyQuery, setKeyQuery] = useState('')
 

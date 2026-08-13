@@ -1068,6 +1068,10 @@ export function ContribWiring({ children }: { children: ReactNode }) {
             gateway={gateway}
             onClose={closeOverlayToPreviousRoute}
             onConfigSaved={() => {
+              // Settings just wrote keys/endpoints via REST — reload them into
+              // the gateway process and clear sticky agent-init failures so the
+              // open chat can send again without creating a new session.
+              void requestGateway('reload.env').catch(() => undefined)
               void refreshArtemisConfig()
               void refreshCurrentModel()
               void queryClient.invalidateQueries({ queryKey: ['model-options'] })

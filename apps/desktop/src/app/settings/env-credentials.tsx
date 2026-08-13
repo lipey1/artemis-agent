@@ -41,10 +41,11 @@ export function SettingsCategoryHeading({ count, icon: Icon, title }: CategoryHe
 // Owns the env-var fetch + the edit/reveal/save/delete lifecycle so multiple
 // credential pages (Providers, Keys) share one source of truth and one set of
 // mutation handlers instead of duplicating the plumbing.
-export function useEnvCredentials(): UseEnvCredentials {
+export function useEnvCredentials(options?: UseEnvCredentialsOptions): UseEnvCredentials {
   const { t } = useI18n()
   const credentials = t.settings.credentials
   const toolsets = t.settings.toolsets
+  const onSaved = options?.onSaved
   const [vars, setVars] = useState<Record<string, EnvVarInfo> | null>(null)
   const [edits, setEdits] = useState<Record<string, string>>({})
   const [revealed, setRevealed] = useState<Record<string, string>>({})
@@ -102,6 +103,7 @@ export function useEnvCredentials(): UseEnvCredentials {
       patchVar(key, { is_set: true, redacted_value: redactedValue(value) })
       clearLocalState(key)
       notify({ kind: 'success', title: toolsets.savedTitle, message: toolsets.savedMessage(key) })
+      onSaved?.()
     } catch (err) {
       notifyError(err, toolsets.failedSave(key))
     } finally {
@@ -126,6 +128,7 @@ export function useEnvCredentials(): UseEnvCredentials {
       patchVar(key, { is_set: true, redacted_value: redactedValue(trimmed) })
       clearLocalState(key)
       notify({ kind: 'success', message: toolsets.savedMessage(key), title: toolsets.savedTitle })
+      onSaved?.()
 
       return { ok: true }
     } catch (err) {
@@ -149,6 +152,7 @@ export function useEnvCredentials(): UseEnvCredentials {
       patchVar(key, { is_set: false, redacted_value: null })
       clearLocalState(key)
       notify({ kind: 'success', title: toolsets.removedTitle, message: toolsets.removedMessage(key) })
+      onSaved?.()
     } catch (err) {
       notifyError(err, toolsets.failedRemove(key))
     } finally {
@@ -190,6 +194,11 @@ interface CategoryHeadingProps {
   count?: string
   icon: IconComponent
   title: string
+}
+
+interface UseEnvCredentialsOptions {
+  /** Fired after a successful save/clear so Settings can reload gateway env. */
+  onSaved?: () => void
 }
 
 interface UseEnvCredentials {

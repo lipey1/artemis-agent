@@ -3,7 +3,7 @@
   "productName": "Artemis",
   "desktopName": "Artemis",
   "private": true,
-  "version": "0.17.33",
+  "version": "0.17.34",
   "description": "Artemis Desktop - native shell for the Artemis agent.",
   "author": "Artemis / lipey1",
   "type": "module",
@@ -198,6 +198,10 @@
         "to": "artemis-cli-wrapper"
       },
       {
+        "from": "../../scripts/artemis.cmd",
+        "to": "artemis.cmd"
+      },
+      {
         "from": "build/install-stamp.json",
         "to": "install-stamp.json"
       },
@@ -294,7 +298,8 @@
       "installerHeaderIcon": "assets/icon.ico",
       "deleteAppDataOnUninstall": false,
       "runAfterFinish": true,
-      "warningsAsErrors": false
+      "warningsAsErrors": false,
+      "include": "../../packaging/windows/installer.nsh"
     },
     "copyright": "Copyright © 2026 Artemis / lipey1"
   }

@@ -238,16 +238,25 @@ def _(rid, params: dict) -> dict:
     handler.  Newly added API keys take effect on the next agent call
     without restarting the TUI.
 
+    Also clears sticky ``agent_error`` on open sessions that failed agent
+    init for missing/invalid providers so the next ``prompt.submit`` can
+    rebuild after Settings saves a key or custom endpoint (same chat works
+    again; users no longer need ``/new`` just to recover from a setup miss).
+
     The credential pool / provider routing for any *already-constructed*
     agent does not auto-rebuild — that's the same behaviour as classic
     CLI's ``/reload``.  Users who want a brand-new credential resolution
-    should follow with ``/new``.
+    on a healthy agent should follow with ``/new``.
     """
     try:
         from artemis_cli.config import reload_env
 
         count = reload_env()
-        return _ok(rid, {"updated": int(count)})
+        cleared = _clear_sticky_agent_init_failures()
+        return _ok(
+            rid,
+            {"updated": int(count), "cleared_agent_errors": int(cleared)},
+        )
     except Exception as e:
         return _err(rid, 5015, str(e))
 
