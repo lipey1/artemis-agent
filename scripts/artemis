@@ -10,23 +10,38 @@ unset PYTHONHOME
 export ARTEMIS_HOME="${ARTEMIS_HOME:-$HOME/.artemis}"
 export ARTEMIS_DESKTOP_APP_NAME="${ARTEMIS_DESKTOP_APP_NAME:-Artemis}"
 
-if [[ -n "${ARTEMIS_ROOT:-}" ]]; then
-  LINK_ROOT="$ARTEMIS_ROOT"
-elif [[ -e /usr/local/lib/artemis-agent ]]; then
-  LINK_ROOT=/usr/local/lib/artemis-agent
-elif [[ -e "$HOME/.local/lib/artemis-agent" ]]; then
-  LINK_ROOT="$HOME/.local/lib/artemis-agent"
-elif [[ -e "$ARTEMIS_HOME/artemis-agent" ]]; then
-  LINK_ROOT="$ARTEMIS_HOME/artemis-agent"
-else
-  LINK_ROOT="$ARTEMIS_HOME/artemis-agent"
-fi
+# A directory that exists is not enough. An empty leftover at
+# /usr/local/lib/artemis-agent used to shadow ~/.artemis/artemis-agent.
+is_engine() {
+  local root="$1"
+  [[ -n "$root" && -x "$root/venv/bin/python" ]]
+}
 
-ROOT="$(readlink -f "$LINK_ROOT" 2>/dev/null || echo "$LINK_ROOT")"
+pick_engine() {
+  local cand resolved
+  for cand in "$@"; do
+    [[ -n "$cand" ]] || continue
+    resolved="$(readlink -f "$cand" 2>/dev/null || echo "$cand")"
+    if is_engine "$resolved"; then
+      printf '%s\n' "$resolved"
+      return 0
+    fi
+  done
+  return 1
+}
+
+LINK_ROOT="$(pick_engine \
+  "${ARTEMIS_ROOT:-}" \
+  "${ARTEMIS_HOME}/artemis-agent" \
+  "$HOME/.local/lib/artemis-agent" \
+  /usr/local/lib/artemis-agent \
+  || true)"
+
+ROOT="$LINK_ROOT"
 PY="$ROOT/venv/bin/python"
 # Prefer the real console-script entry; never recurse into this wrapper.
 CLI_BIN="$ROOT/venv/bin/artemis-cli"
-if [[ ! -x "$CLI_BIN" ]]; then
+if [[ -n "$ROOT" && ! -x "$CLI_BIN" ]]; then
   CLI_BIN="$ROOT/venv/bin/artemis"
 fi
 ENTRY_PY="$ROOT/artemis"
@@ -65,8 +80,10 @@ if [[ "${1:-}" == "desktop" || "${1:-}" == "gui" ]]; then
   set -- desktop "$@"
 fi
 
-if [[ ! -x "$PY" ]]; then
-  echo "Artemis engine not found at $LINK_ROOT (-> $ROOT)" >&2
+if [[ -z "$ROOT" || ! -x "$PY" ]]; then
+  echo "Artemis engine not found (need a venv at ~/.artemis/artemis-agent)." >&2
+  echo "Open Artemis Desktop once to finish first-run setup, or run:" >&2
+  echo "  curl -fsSL https://raw.githubusercontent.com/lipey1/artemis-desktop/main/scripts/install.sh | bash" >&2
   exit 1
 fi
 
@@ -79,12 +96,12 @@ Usage:
   artemis desktop               Open Artemis Desktop (installed app)
   artemis chat | gateway | model | status | doctor | ...
 
-Engine link: $LINK_ROOT
-Data:        \$HOME/.artemis
+Engine: $ROOT
+Data:   \$HOME/.artemis
 HELP
 fi
 
-export ARTEMIS_ENGINE_ROOT="$LINK_ROOT"
+export ARTEMIS_ENGINE_ROOT="$ROOT"
 
 if [[ "${1:-}" == "update" ]]; then
   echo "Artemis updates come from GitHub Releases."

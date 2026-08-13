@@ -3779,6 +3779,32 @@ function writeBootstrapMarker(payload) {
   return merged
 }
 
+/** Put `artemis` on PATH (user-local) after Desktop install / first-run. */
+function ensureCliPathEntry() {
+  if (process.platform === 'win32') {
+    return
+  }
+
+  const dest = path.join(os.homedir(), '.local', 'bin', 'artemis')
+  const candidates = [
+    process.resourcesPath ? path.join(process.resourcesPath, 'artemis-cli-wrapper') : '',
+    path.join(SOURCE_REPO_ROOT, 'scripts', 'artemis')
+  ].filter(Boolean)
+  const src = candidates.find(fileExists)
+
+  if (!src) {
+    return
+  }
+
+  try {
+    fs.mkdirSync(path.dirname(dest), { recursive: true })
+    fs.copyFileSync(src, dest)
+    fs.chmodSync(dest, 0o755)
+  } catch (err) {
+    rememberLog(`[cli] failed to install PATH wrapper: ${err instanceof Error ? err.message : String(err)}`)
+  }
+}
+
 function resolveWebDist() {
   const override = process.env.ARTEMIS_DESKTOP_WEB_DIST
 
@@ -4300,6 +4326,7 @@ async function ensureRuntime(backend) {
       }
 
       rememberLog('[bootstrap] bootstrap complete; marker written. Re-resolving backend.')
+      ensureCliPathEntry()
 
       // Re-resolve now that the install exists. The new resolution lands in
       // step 3 (bootstrap-complete marker) and we recurse to wire venvPython.
@@ -12233,6 +12260,7 @@ app.whenReady().then(() => {
     Menu.setApplicationMenu(null)
   }
 
+  ensureCliPathEntry()
   installMediaPermissions()
   registerMediaProtocol()
   installEmbedReferer()

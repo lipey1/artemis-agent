@@ -3,7 +3,7 @@
   "productName": "Artemis",
   "desktopName": "Artemis",
   "private": true,
-  "version": "0.17.26",
+  "version": "0.17.27",
   "description": "Artemis Desktop - native shell for the Artemis agent.",
   "author": "Artemis / lipey1",
   "type": "module",
@@ -192,6 +192,10 @@
     "beforePack": "scripts/before-pack.mjs",
     "afterPack": "scripts/after-pack.mjs",
     "extraResources": [
+      {
+        "from": "../../scripts/artemis",
+        "to": "artemis-cli-wrapper"
+      },
       {
         "from": "build/install-stamp.json",
         "to": "install-stamp.json"

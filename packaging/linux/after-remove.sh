@@ -4,6 +4,9 @@
 set -uo pipefail
 
 rm -f /usr/bin/Artemis 2>/dev/null || true
+if grep -q 'Agent CLI on PATH' /usr/local/bin/artemis 2>/dev/null; then
+  rm -f /usr/local/bin/artemis 2>/dev/null || true
+fi
 
 if command -v update-desktop-database >/dev/null 2>&1; then
   update-desktop-database /usr/share/applications >/dev/null 2>&1 || true

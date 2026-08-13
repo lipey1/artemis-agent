@@ -66,6 +66,28 @@ if [ -f "$DESKTOP_FILE" ]; then
   fi
 fi
 
+# --- 3b. Agent CLI on PATH (lowercase `artemis`) -----------------------------
+# Desktop is /usr/bin/Artemis. The CLI wrapper must land on PATH from the .deb
+# so `artemis` works after install without a second script. Skip empty leftover
+# engine dirs (no venv) that used to shadow ~/.artemis/artemis-agent.
+CLI_WRAPPER="/opt/Artemis/resources/artemis-cli-wrapper"
+if [ -f "$CLI_WRAPPER" ]; then
+  mkdir -p /usr/local/bin 2>/dev/null || true
+  install -m 755 "$CLI_WRAPPER" /usr/local/bin/artemis 2>/dev/null || true
+  for home in /home/* /root; do
+    [ -d "$home" ] || continue
+    mkdir -p "$home/.local/bin" 2>/dev/null || true
+    install -m 755 "$CLI_WRAPPER" "$home/.local/bin/artemis" 2>/dev/null || true
+    owner=`stat -c %U:%G "$home" 2>/dev/null` || owner=""
+    if [ -n "$owner" ]; then
+      chown "$owner" "$home/.local/bin/artemis" 2>/dev/null || true
+    fi
+  done
+fi
+if [ -d /usr/local/lib/artemis-agent ] && [ ! -x /usr/local/lib/artemis-agent/venv/bin/python ]; then
+  rmdir /usr/local/lib/artemis-agent 2>/dev/null || true
+fi
+
 # User-local overrides must not redirect the launcher to the CLI either.
 for home in /home/* /root; do
   [ -d "$home" ] || continue
