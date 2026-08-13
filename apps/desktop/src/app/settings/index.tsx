@@ -217,7 +217,6 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
             onSelect: () => openProviderView('custom-endpoints')
           }
         ],
-        gapBefore: true,
         icon: Zap,
         id: 'providers',
         label: t.settings.nav.providers,
