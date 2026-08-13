@@ -202,7 +202,7 @@ function installedAgentInstallScript(artemisHome) {
   }
 
   const scriptName = installScriptName()
-  for (const folder of ['artemis-agent', 'artemis-agent']) {
+  for (const folder of ['artemis-agent', 'hermes-agent']) {
     const candidate = path.join(artemisHome, folder, 'scripts', scriptName)
     try {
       fs.accessSync(candidate, fs.constants.R_OK)

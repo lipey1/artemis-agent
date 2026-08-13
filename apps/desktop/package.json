@@ -287,6 +287,13 @@
       "perMachine": false,
       "shortcutName": "Artemis",
       "uninstallDisplayName": "Artemis",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true,
       "warningsAsErrors": false
     },
     "copyright": "Copyright © 2026 Artemis / lipey1"

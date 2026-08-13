@@ -69,6 +69,21 @@ test('installedAgentInstallScript resolves the installer in the agent checkout',
   }
 })
 
+test('installedAgentInstallScript falls back to hermes-agent checkout', () => {
+  const home = mkTmpHome()
+
+  try {
+    const scriptsDir = path.join(home, 'hermes-agent', 'scripts')
+    fs.mkdirSync(scriptsDir, { recursive: true })
+    const scriptPath = path.join(scriptsDir, SCRIPT_NAME)
+    fs.writeFileSync(scriptPath, '#!/bin/sh\necho hi\n')
+
+    assert.equal(installedAgentInstallScript(home), scriptPath)
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true })
+  }
+})
+
 test('existing checkout detection requires git metadata', () => {
   const home = mkTmpHome()
 

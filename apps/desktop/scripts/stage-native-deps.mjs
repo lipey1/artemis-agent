@@ -526,14 +526,17 @@ export function stageGetWindowsInto(
 }
 
 function rebuildGetWindowsViaNpm() {
-  const result = spawnSync('npm', ['rebuild', 'get-windows'], {
-    cwd: resolve(projectRoot, '..', '..'),
+  // get-windows lives in apps/desktop (this projectRoot). Rebuilding from the
+  // monorepo root is a no-op under pnpm and leaves only the darwin bindings
+  // that ship in the npm tarball, which then fails the win32 staging gate.
+  const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+  const result = spawnSync(pnpm, ['rebuild', 'get-windows'], {
+    cwd: projectRoot,
     stdio: 'inherit',
-    // npm resolves to npm.cmd on Windows, which needs a shell.
     shell: process.platform === 'win32'
   })
   if (result.status !== 0) {
-    console.warn(`[stage-native-deps] npm rebuild get-windows exited with ${result.status}`)
+    console.warn(`[stage-native-deps] pnpm rebuild get-windows exited with ${result.status}`)
   }
 }
 

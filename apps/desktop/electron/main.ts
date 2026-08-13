@@ -557,8 +557,8 @@ function resolveArtemisHome() {
   if (process.env.ARTEMIS_HOME) {
     return normalizeArtemisHomeRoot(process.env.ARTEMIS_HOME)
   }
-  if (process.env.ARTEMIS_HOME) {
-    return normalizeArtemisHomeRoot(process.env.ARTEMIS_HOME)
+  if (process.env.HERMES_HOME) {
+    return normalizeArtemisHomeRoot(process.env.HERMES_HOME)
   }
 
   if (USER_DATA_OVERRIDE) {
@@ -572,7 +572,8 @@ function resolveArtemisHome() {
     // backend silently falls back to %LOCALAPPDATA%\artemis and reports "No
     // inference provider configured" despite a valid configured home (#45471).
     // Consult the live User-scoped registry value before the default below.
-    const fromRegistry = readWindowsUserEnvVar('ARTEMIS_HOME')
+    const fromRegistry =
+      readWindowsUserEnvVar('ARTEMIS_HOME') || readWindowsUserEnvVar('HERMES_HOME')
 
     if (fromRegistry) {
       return normalizeArtemisHomeRoot(fromRegistry)
@@ -609,11 +610,11 @@ function pathWithArtemisManagedNode(...entries) {
 }
 
 // ACTIVE_ARTEMIS_ROOT — the canonical mutable agent install. Prefer
-// artemis-agent (Artemis product layout); fall back to artemis-agent for one
+// artemis-agent (Artemis product layout); fall back to hermes-agent for one
 // release so existing checkouts keep working without a blind identifier rename.
 function resolveActiveAgentRoot(artemisHome: string): string {
   const preferred = path.join(artemisHome, 'artemis-agent')
-  const legacy = path.join(artemisHome, 'artemis-agent')
+  const legacy = path.join(artemisHome, 'hermes-agent')
   if (directoryExists(preferred)) return preferred
   if (directoryExists(legacy)) return legacy
   return preferred

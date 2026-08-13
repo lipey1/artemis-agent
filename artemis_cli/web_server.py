@@ -7141,7 +7141,13 @@ def _catalog_provider_env_metadata() -> dict:
 async def get_env_vars(profile: Optional[str] = None):
     # _profile_scope takes _SKILLS_PROFILE_LOCK and load_env()/catalog
     # discovery read from disk — keep the whole build off the event loop.
-    return await asyncio.to_thread(_get_env_vars_sync, profile)
+    try:
+        return await asyncio.to_thread(_get_env_vars_sync, profile)
+    except HTTPException:
+        raise
+    except Exception:
+        _log.exception("GET /api/env failed")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 def _get_env_vars_sync(profile: Optional[str] = None):
@@ -13822,6 +13828,42 @@ from artemis_cli.web_routers.profiles import (  # noqa: E402,F401 — legacy re-
 
 _SKILLS_PROFILE_LOCK = threading.RLock()
 
+_SKILL_HOME_ATTRS = ("ARTEMIS_HOME", "HERMES_HOME")
+
+
+def _snapshot_skill_module_home(module) -> tuple[object, object]:
+    """Read the module-level home/skills dirs without assuming the Artemis name.
+
+    Mid-rename engines still export ``HERMES_HOME`` while web_server binds
+    ``ARTEMIS_HOME``. A bare attribute lookup 500s every profile-scoped
+    route (``/api/env``, ``/api/model/info``, OAuth catalog, …).
+    """
+    home = None
+    for attr in _SKILL_HOME_ATTRS:
+        if hasattr(module, attr):
+            home = getattr(module, attr)
+            break
+    skills_dir = getattr(module, "SKILLS_DIR", None)
+    return home, skills_dir
+
+
+def _bind_skill_module_home(module, profile_dir) -> None:
+    skills_dir = profile_dir / "skills"
+    setattr(module, "ARTEMIS_HOME", profile_dir)
+    if hasattr(module, "HERMES_HOME"):
+        setattr(module, "HERMES_HOME", profile_dir)
+    setattr(module, "SKILLS_DIR", skills_dir)
+
+
+def _restore_skill_module_home(module, snapshot: tuple[object, object]) -> None:
+    home, skills_dir = snapshot
+    if hasattr(module, "ARTEMIS_HOME"):
+        setattr(module, "ARTEMIS_HOME", home)
+    if hasattr(module, "HERMES_HOME"):
+        setattr(module, "HERMES_HOME", home)
+    if hasattr(module, "SKILLS_DIR"):
+        setattr(module, "SKILLS_DIR", skills_dir)
+
 
 @contextmanager
 def _profile_scope(profile: Optional[str]):
@@ -13863,21 +13905,15 @@ def _profile_scope(profile: Optional[str]):
         token = set_artemis_home_override(str(profile_dir))
 
     with _SKILLS_PROFILE_LOCK:
-        old_home = _skills_tool.ARTEMIS_HOME
-        old_skills_dir = _skills_tool.SKILLS_DIR
-        old_mgr_home = _skill_mgr.ARTEMIS_HOME
-        old_mgr_skills_dir = _skill_mgr.SKILLS_DIR
-        _skills_tool.ARTEMIS_HOME = profile_dir
-        _skills_tool.SKILLS_DIR = profile_dir / "skills"
-        _skill_mgr.ARTEMIS_HOME = profile_dir
-        _skill_mgr.SKILLS_DIR = profile_dir / "skills"
+        old_skills = _snapshot_skill_module_home(_skills_tool)
+        old_mgr = _snapshot_skill_module_home(_skill_mgr)
+        _bind_skill_module_home(_skills_tool, profile_dir)
+        _bind_skill_module_home(_skill_mgr, profile_dir)
         try:
             yield profile_dir if token is not None else None
         finally:
-            _skills_tool.ARTEMIS_HOME = old_home
-            _skills_tool.SKILLS_DIR = old_skills_dir
-            _skill_mgr.ARTEMIS_HOME = old_mgr_home
-            _skill_mgr.SKILLS_DIR = old_mgr_skills_dir
+            _restore_skill_module_home(_skills_tool, old_skills)
+            _restore_skill_module_home(_skill_mgr, old_mgr)
             if token is not None:
                 reset_artemis_home_override(token)
 
