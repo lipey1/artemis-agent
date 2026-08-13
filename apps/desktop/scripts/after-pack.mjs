@@ -1,7 +1,7 @@
 /**
  * after-pack.mjs — electron-builder afterPack hook.
  *
- * Windows: stamps the Artemis icon + identity onto Artemis.exe via rcedit.
+ * Windows: stamps the Artemis icon + identity onto Artemis.exe via resedit.
  * Linux: marks chrome-sandbox mode 4755 in the unpacked tree so the bit is
  * present before fpm packs the .deb (after-install.sh re-applies as root).
  *

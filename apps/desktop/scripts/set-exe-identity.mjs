@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 // set-exe-identity.mjs — stamp the Artemis icon + version metadata onto the
-// built Artemis.exe using rcedit, completely decoupled from electron-builder's
-// signing path.
+// built Artemis.exe with resedit (pure JS PE editor). No Wine, no rcedit.exe.
 //
 // WHY THIS EXISTS
 // ---------------
@@ -14,43 +13,45 @@
 //
 // The cost of disabling signAndEditExecutable is that electron-builder also
 // skips rcedit, so the unpacked Artemis.exe keeps the stock Electron icon and
-// "Electron" taskbar name. This script restores the icon + identity by calling
-// rcedit DIRECTLY. rcedit is a pure PE resource editor: no signing, no certs,
-// no winCodeSign, no symlinks.
+// "Electron" taskbar name. This script restores the icon + identity.
+//
+// rcedit (the Electron CLI) is a Windows .exe and needs Wine on Linux. That
+// failed our cross-packs. resedit is JavaScript-only and works on the Linux
+// builder.
 //
 // HOW IT RUNS
 // -----------
-// Primarily as an electron-builder `afterPack` hook (scripts/after-pack.mjs),
-// so EVERY packed build — first install, `artemis desktop`, the installer's
-// --update rebuild, or a dev's manual `npm run pack` — gets a branded exe from
-// one place. Previously this stamp lived only in install.ps1, so the update
-// path (which rebuilds via `artemis desktop --build-only`, never install.ps1)
-// shipped a stock "Electron" exe. Keeping it in afterPack closes that gap.
-//
-// Also runnable standalone for ad-hoc re-stamping:
+// Primarily as an electron-builder `afterPack` hook (scripts/after-pack.mjs).
+// Also runnable standalone:
 //   node scripts/set-exe-identity.mjs <path-to-Artemis.exe>
-//
-// Exits 0 on success, non-zero on failure when run as a CLI. As a hook,
-// stampExeIdentity() resolves on success and rejects on failure; the caller
-// (after-pack.mjs) swallows the rejection so a stamp failure never fails an
-// otherwise-good build (worst case: stock icon, not a broken app).
 
+import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { resolve, join } from 'node:path'
-import { existsSync } from 'node:fs'
 
-import { rcedit } from 'rcedit'
+import * as ResEdit from 'resedit'
 
 import { isMain } from './utils.mjs'
 
-// Stamp the Artemis icon + identity onto `exe`. Resolves on success, throws on
-// failure. `desktopRoot` defaults to this script's package root so the icon and
-// the rcedit dependency resolve regardless of cwd.
+const LANG_EN_US = 1033
+const CODEPAGE_UNICODE = 1200
+
+function readProductVersion(desktopRoot) {
+  try {
+    const pkg = JSON.parse(readFileSync(join(desktopRoot, 'package.json'), 'utf8'))
+    const raw = String(pkg.version || '').trim()
+    const parts = raw.split('.').map((n) => parseInt(n, 10) || 0)
+    while (parts.length < 4) parts.push(0)
+    return { raw: raw || '0.0.0', parts: parts.slice(0, 4) }
+  } catch {
+    return { raw: '0.0.0', parts: [0, 0, 0, 0] }
+  }
+}
+
 async function stampExeIdentity(exe, desktopRoot = resolve(import.meta.dirname, '..')) {
   if (!exe || !existsSync(exe)) {
     throw new Error(`target exe not found: ${exe}`)
   }
 
-  // Icon lives at apps/desktop/assets/icon.ico
   const icon = join(desktopRoot, 'assets', 'icon.ico')
   if (!existsSync(icon)) {
     throw new Error(`icon not found: ${icon}`)
@@ -59,29 +60,56 @@ async function stampExeIdentity(exe, desktopRoot = resolve(import.meta.dirname, 
   console.log(`[set-exe-identity] stamping ${exe}`)
   console.log(`[set-exe-identity] icon: ${icon}`)
 
-  await rcedit(exe, {
-    icon,
-    'version-string': {
+  const exeBuf = readFileSync(exe)
+  const nt = ResEdit.NtExecutable.from(exeBuf, { ignoreCert: true })
+  const res = ResEdit.NtExecutableResource.from(nt)
+  const iconFile = ResEdit.Data.IconFile.from(readFileSync(icon))
+  const icons = iconFile.icons.map((item) => item.data)
+
+  const groups = ResEdit.Resource.IconGroupEntry.fromEntries(res.entries)
+  if (groups.length === 0) {
+    ResEdit.Resource.IconGroupEntry.replaceIconsForResource(res.entries, 1, LANG_EN_US, icons)
+  } else {
+    for (const group of groups) {
+      ResEdit.Resource.IconGroupEntry.replaceIconsForResource(res.entries, group.id, group.lang, icons)
+    }
+  }
+
+  const version = readProductVersion(desktopRoot)
+  const viList = ResEdit.Resource.VersionInfo.fromEntries(res.entries)
+  const vi = viList[0] || ResEdit.Resource.VersionInfo.createEmpty()
+  vi.setFileVersion(...version.parts, LANG_EN_US)
+  vi.setProductVersion(...version.parts, LANG_EN_US)
+  vi.setStringValues(
+    { lang: LANG_EN_US, codepage: CODEPAGE_UNICODE },
+    {
       ProductName: 'Artemis',
       FileDescription: 'Artemis',
       CompanyName: 'Artemis / lipey1',
-      LegalCopyright: 'Copyright (c) 2026 Artemis / lipey1'
+      LegalCopyright: 'Copyright (c) 2026 Artemis / lipey1',
+      FileVersion: version.raw,
+      ProductVersion: version.raw,
+      OriginalFilename: 'Artemis.exe',
+      InternalName: 'Artemis'
     }
-  })
+  )
+  vi.outputToResourceEntries(res.entries)
+
+  res.outputResource(nt)
+  writeFileSync(exe, Buffer.from(nt.generate()))
 
   console.log('[set-exe-identity] done — Artemis icon + identity stamped')
 }
 
 export { stampExeIdentity }
 
-// CLI entry point: `node scripts/set-exe-identity.mjs <exe>`.
 if (isMain(import.meta.url)) {
   const exe = process.argv[2]
   if (!exe) {
     console.error('[set-exe-identity] usage: set-exe-identity.mjs <path-to-exe>')
     process.exit(2)
   }
-  stampExeIdentity(exe).catch(err => {
+  stampExeIdentity(exe).catch((err) => {
     console.error(`[set-exe-identity] ${err.message}`)
     process.exit(1)
   })
