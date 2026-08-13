@@ -225,7 +225,6 @@ export const ja = defineLocale({
     resetFailed: 'リセットに失敗しました',
     nav: {
       providers: 'プロバイダー',
-      providerAccounts: 'アカウント',
       providerApiKeys: 'API キー',
       providerCustomEndpoints: 'カスタムエンドポイント',
       gateway: 'ゲートウェイ',
@@ -236,7 +235,6 @@ export const ja = defineLocale({
       mcp: 'MCP',
       archivedChats: 'アーカイブ済みチャット',
       about: '情報',
-      billing: '請求',
       notifications: '通知'
     },
     notifications: {
@@ -887,19 +885,6 @@ export const ja = defineLocale({
       }
     },
     providers: {
-      connectAccount: 'アカウントを接続',
-      haveApiKey: 'API キーをお持ちですか？',
-      intro:
-        'サブスクリプションでサインインします。API キーのコピーは不要です。Artemis がアプリ内でブラウザーサインインを代行します。',
-      connected: '接続済み',
-      collapse: '折りたたむ',
-      connectAnother: '別のプロバイダーを接続',
-      otherProviders: 'その他のプロバイダー',
-      removeConfirm: provider => `${provider} を削除しますか？`,
-      removeKeyManaged: provider => `${provider} は API キーで設定されています。API Keys から削除してください。`,
-      removedTitle: 'アカウントを削除しました',
-      removedMessage: provider => `${provider} を削除しました。`,
-      failedRemove: provider => `${provider} を削除できませんでした`,
       noProviderKeys: '利用可能なプロバイダー API キーがありません。',
       searchKeys: 'プロバイダーを検索…',
       noKeysMatch: '一致するプロバイダーがありません。',

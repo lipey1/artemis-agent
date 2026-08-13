@@ -219,7 +219,6 @@ export const zhHant = defineLocale({
     resetFailed: '重設失敗',
     nav: {
       providers: '提供方',
-      providerAccounts: '帳號',
       providerApiKeys: 'API 金鑰',
       providerCustomEndpoints: '自訂端點',
       gateway: '閘道',
@@ -230,7 +229,6 @@ export const zhHant = defineLocale({
       mcp: 'MCP',
       archivedChats: '已封存聊天',
       about: '關於',
-      billing: '帳單',
       notifications: '通知'
     },
     notifications: {
@@ -859,18 +857,6 @@ export const zhHant = defineLocale({
       }
     },
     providers: {
-      connectAccount: '連結帳號',
-      haveApiKey: '改用 API 金鑰？',
-      intro: '使用訂閱登入，無需複製 API 金鑰。Artemis 會在應用程式中為您完成瀏覽器登入。',
-      connected: '已連線',
-      collapse: '收合',
-      connectAnother: '連結其他提供方',
-      otherProviders: '其他提供方',
-      removeConfirm: provider => `移除 ${provider}？`,
-      removeKeyManaged: provider => `${provider} 由 API 金鑰設定。請從 API Keys 中移除。`,
-      removedTitle: '帳號已移除',
-      removedMessage: provider => `${provider} 已移除。`,
-      failedRemove: provider => `無法移除 ${provider}`,
       noProviderKeys: '沒有可用的提供方 API 金鑰。',
       searchKeys: '搜尋提供方…',
       noKeysMatch: '沒有符合的提供方。',

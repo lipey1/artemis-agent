@@ -6,7 +6,6 @@ import type { EnvVarInfo } from '@/types/artemis'
 
 export type SettingsView =
   | 'about'
-  | 'billing'
   | 'gateway'
   | 'keybinds'
   | 'keys'

@@ -290,7 +290,6 @@ export interface Translations {
     resetFailed: string
     nav: {
       providers: string
-      providerAccounts: string
       providerApiKeys: string
       providerCustomEndpoints: string
       gateway: string
@@ -301,7 +300,6 @@ export interface Translations {
       mcp: string
       archivedChats: string
       about: string
-      billing: string
       notifications: string
       plugins: string
     }
@@ -706,23 +704,6 @@ export interface Translations {
       tasks: Record<string, AuxTaskCopy>
     }
     providers: {
-      connectAccount: string
-      haveApiKey: string
-      intro: string
-      connected: string
-      collapse: string
-      connectAnother: string
-      otherProviders: string
-      disconnect: string
-      disconnectInTerminal: string
-      removeConfirm: (provider: string) => string
-      removeExternalGeneric: (provider: string) => string
-      removeKeyManaged: (provider: string) => string
-      removeTerminalConfirm: (provider: string, command: string) => string
-      removeTerminalRunning: (provider: string) => string
-      removedTitle: string
-      removedMessage: (provider: string) => string
-      failedRemove: (provider: string) => string
       noProviderKeys: string
       searchKeys: string
       noKeysMatch: string

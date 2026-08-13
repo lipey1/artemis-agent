@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, type ChangeEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
-import { codiconIcon } from '@/components/ui/codicon'
 import { Tip } from '@/components/ui/tooltip'
 import { getArtemisConfigDefaults, getArtemisConfigRecord, saveArtemisConfig } from '@/artemis'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import {
   Archive,
-  BarChart3,
   Bell,
   Download,
   Globe,
@@ -34,7 +32,6 @@ import { SKILLS_ROUTE } from '../routes'
 
 import { AboutSettings } from './about-settings'
 import { AppearanceSettings } from './appearance-settings'
-import { BillingSettings } from './billing'
 import { ConfigSettings } from './config-settings'
 import { SECTIONS } from './constants'
 import { GatewaySettings } from './gateway-settings'
@@ -53,7 +50,6 @@ const SETTINGS_VIEWS: readonly SettingsViewId[] = [
   'keybinds',
   'keys',
   'notifications',
-  'billing',
   'plugins',
   'sessions',
   'about'
@@ -68,6 +64,7 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
   // `/settings?tab=mcp` deep links working — `useRouteEnumParam` would silently
   // coerce the unknown tab to the default view otherwise. Preserve `server=` so
   // an old bookmark still lands on (and highlights) the selected server.
+  // Billing was removed from Settings; send leftover `?tab=billing` to API keys.
   useEffect(() => {
     const params = new URLSearchParams(search)
 
@@ -75,13 +72,22 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
       const server = params.get('server')
       const suffix = server ? `&server=${encodeURIComponent(server)}` : ''
       navigate(`${SKILLS_ROUTE}?tab=mcp${suffix}`, { replace: true })
+      return
     }
-  }, [navigate, search])
+
+    if (params.get('tab') === 'billing') {
+      params.set('tab', 'providers')
+      params.delete('bview')
+      const qs = params.toString()
+      navigate({ hash, pathname, search: qs ? `?${qs}` : '' }, { replace: true })
+    }
+  }, [hash, navigate, pathname, search])
 
   const [activeView, setActiveView] = useRouteEnumParam('tab', SETTINGS_VIEWS, 'config:model' as SettingsViewId)
-  // Providers subnav (Accounts vs API keys) lives in its own param so each
-  // sub-view is deep-linkable and survives a refresh.
-  const [providerView, setProviderView] = useRouteEnumParam<ProviderView>('pview', PROVIDER_VIEWS, 'accounts')
+  // Providers subnav (API keys vs custom endpoints) lives in its own param so
+  // each sub-view is deep-linkable and survives a refresh. Unknown values
+  // (including the retired `accounts` view) fall back to keys.
+  const [providerView] = useRouteEnumParam<ProviderView>('pview', PROVIDER_VIEWS, 'keys')
   const [keysView] = useRouteEnumParam<KeysView>('kview', KEYS_VIEWS, 'tools')
 
   // Jump to a section + its sub-view in one navigate. Two sequential setters
@@ -105,7 +111,7 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
   )
 
   const openProviderView = useCallback(
-    (view: ProviderView) => openSubView('providers', 'pview', view, 'accounts'),
+    (view: ProviderView) => openSubView('providers', 'pview', view, 'keys'),
     [openSubView]
   )
 
@@ -194,22 +200,8 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
         onSelect: () => setActiveView('notifications')
       },
       {
-        active: activeView === 'billing',
-        icon: BarChart3,
-        id: 'billing',
-        label: t.settings.nav.billing,
-        onSelect: () => setActiveView('billing')
-      },
-      {
         active: activeView === 'providers',
         children: [
-          {
-            active: activeView === 'providers' && providerView === 'accounts',
-            icon: codiconIcon('account'),
-            id: 'pview:accounts',
-            label: t.settings.nav.providerAccounts,
-            onSelect: () => openProviderView('accounts')
-          },
           {
             active: activeView === 'providers' && providerView === 'keys',
             icon: KeyRound,
@@ -354,18 +346,14 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
             />
           ) : activeView === 'providers' ? (
             <ProvidersSettings
-              onClose={onClose}
               onConfigSaved={onConfigSaved}
               onMainModelChanged={onMainModelChanged}
-              onViewChange={setProviderView}
               view={providerView}
             />
           ) : activeView === 'keys' ? (
             <KeysSettings view={keysView} />
           ) : activeView === 'notifications' ? (
             <NotificationsSettings />
-          ) : activeView === 'billing' ? (
-            <BillingSettings />
           ) : activeView === 'plugins' ? (
             <PluginsSettings />
           ) : (

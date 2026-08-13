@@ -340,7 +340,6 @@ export const en: Translations = {
     resetFailed: 'Reset failed',
     nav: {
       providers: 'Providers',
-      providerAccounts: 'Accounts',
       providerApiKeys: 'API keys',
       providerCustomEndpoints: 'Custom Endpoints',
       gateway: 'Gateway',
@@ -351,7 +350,6 @@ export const en: Translations = {
       mcp: 'MCP',
       archivedChats: 'Archived Chats',
       about: 'About',
-      billing: 'Billing',
       notifications: 'Notifications',
       plugins: 'Plugins'
     },
@@ -831,25 +829,6 @@ export const en: Translations = {
       }
     },
     providers: {
-      connectAccount: 'Connect an account',
-      haveApiKey: 'Have an API key instead?',
-      intro:
-        'Sign in with a subscription — no API key to copy. Artemis runs the browser sign-in for you, right here in the app.',
-      connected: 'Connected',
-      collapse: 'Collapse',
-      connectAnother: 'Connect another provider',
-      otherProviders: 'Other providers',
-      disconnect: 'Disconnect',
-      disconnectInTerminal: 'Disconnect (runs the removal command in the terminal)',
-      removeConfirm: provider => `Remove ${provider}?`,
-      removeExternalGeneric: provider => `${provider} is managed by its own CLI — remove it there.`,
-      removeKeyManaged: provider => `${provider} is configured from an API key. Remove it from API Keys.`,
-      removeTerminalConfirm: (provider, command) =>
-        `Disconnect ${provider}? This runs "${command}" in the terminal to clear the credential.`,
-      removeTerminalRunning: provider => `Running ${provider} disconnect in the terminal…`,
-      removedTitle: 'Account removed',
-      removedMessage: provider => `${provider} was removed.`,
-      failedRemove: provider => `Could not remove ${provider}`,
       noProviderKeys: 'No provider API keys available.',
       searchKeys: 'Search providers…',
       noKeysMatch: 'No providers match your search.',

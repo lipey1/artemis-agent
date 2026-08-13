@@ -178,7 +178,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
     billingSettingsSeenRef.current = billingSettingsRequest
 
     if (billingSettingsRequest > 0) {
-      navigate(`${SETTINGS_ROUTE}?tab=billing`)
+      navigate(`${SETTINGS_ROUTE}?tab=providers`)
     }
   }, [billingSettingsRequest, navigate])
   const freshDraftReady = useStore($freshDraftReady)

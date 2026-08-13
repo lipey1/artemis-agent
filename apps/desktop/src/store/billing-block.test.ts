@@ -54,10 +54,17 @@ test('clearBillingBlock with no arg clears any active block', () => {
   expect($billingBlock.get()).toBeNull()
 })
 
-test('runBillingRecovery routes Nous to in-app Settings, never an external link', () => {
-  runBillingRecovery(makeBlock({ is_nous: true, provider: 'nous', provider_label: 'Nous Portal' }))
-  expect($billingSettingsRequest.get()).toBe(1)
-  expect(openExternalLink).not.toHaveBeenCalled()
+test('runBillingRecovery opens a Nous billing URL when present', () => {
+  runBillingRecovery(
+    makeBlock({
+      billing_url: 'https://portal.nousresearch.com/billing',
+      is_nous: true,
+      provider: 'nous',
+      provider_label: 'Nous Portal'
+    })
+  )
+  expect(openExternalLink).toHaveBeenCalledWith('https://portal.nousresearch.com/billing')
+  expect($billingSettingsRequest.get()).toBe(0)
 })
 
 test('runBillingRecovery deep-links a third-party provider to its billing page', () => {
