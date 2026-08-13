@@ -3,7 +3,7 @@
 Installer binaries for Linux, macOS, and Windows are published on GitHub Releases
 (files exceed practical git size limits):
 
-https://github.com/lipey1/artemis-desktop/releases/latest
+https://github.com/lipey1/artemis-agent/releases/latest
 
 This folder keeps `SHA256SUMS` for the current release assets.
 

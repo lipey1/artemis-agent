@@ -21,7 +21,7 @@ import {
 import { ListRow, SectionHeading, SettingsContent } from './primitives'
 import { UninstallSection } from './uninstall-section'
 
-const RELEASE_NOTES_URL = 'https://github.com/lipey1/artemis-desktop/releases'
+const RELEASE_NOTES_URL = 'https://github.com/lipey1/artemis-agent/releases'
 
 function relativeTime(ms: number | undefined, a: Translations['settings']['about']) {
   if (!ms) {

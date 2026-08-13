@@ -26,7 +26,7 @@
  * commit as unpinned and follows the branch instead of fetching a fake SHA.
  */
 
-import { mkdirSync, writeFileSync } from "fs"
+import { mkdirSync, readFileSync, writeFileSync } from "fs"
 import { resolve, join, relative } from "path"
 import { execSync } from "child_process"
 
@@ -149,13 +149,22 @@ function main() {
     )
   }
 
+  let version = ""
+  try {
+    const pkg = JSON.parse(readFileSync(join(DESKTOP_ROOT, "package.json"), "utf8"))
+    version = String(pkg.version || "").trim()
+  } catch {
+    version = ""
+  }
+
   const payload = {
     schemaVersion: STAMP_SCHEMA_VERSION,
     commit: stamp.commit,
     branch: stamp.branch,
     builtAt: new Date().toISOString(),
     dirty: stamp.dirty,
-    source: stamp.source
+    source: stamp.source,
+    ...(version ? { version } : {})
   }
 
   mkdirSync(OUT_DIR, { recursive: true })

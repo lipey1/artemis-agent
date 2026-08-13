@@ -83,7 +83,7 @@ fi
 if [[ -z "$ROOT" || ! -x "$PY" ]]; then
   echo "Artemis engine not found (need a venv at ~/.artemis/artemis-agent)." >&2
   echo "Open Artemis Desktop once to finish first-run setup, or run:" >&2
-  echo "  curl -fsSL https://raw.githubusercontent.com/lipey1/artemis-desktop/main/scripts/install.sh | bash" >&2
+  echo "  curl -fsSL https://raw.githubusercontent.com/lipey1/artemis-agent/main/scripts/install.sh | bash" >&2
   exit 1
 fi
 
@@ -105,7 +105,7 @@ export ARTEMIS_ENGINE_ROOT="$ROOT"
 
 if [[ "${1:-}" == "update" ]]; then
   echo "Artemis updates come from GitHub Releases."
-  echo "  https://github.com/lipey1/artemis-desktop/releases/latest"
+  echo "  https://github.com/lipey1/artemis-agent/releases/latest"
   echo "Download the asset for your OS and install it over the current build."
   exit 0
 fi

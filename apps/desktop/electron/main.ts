@@ -2559,7 +2559,7 @@ async function checkUpdates() {
   }
 
   try {
-    const res = await fetch('https://api.github.com/repos/lipey1/artemis-desktop/releases/latest', {
+    const res = await fetch('https://api.github.com/repos/lipey1/artemis-agent/releases/latest', {
       headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Artemis-Desktop' }
     })
     if (!res.ok) {
@@ -2608,9 +2608,9 @@ async function checkUpdates() {
       message: behind > 0
         ? IS_LINUX && isDebInstall(process.execPath, process.env)
           ? `Artemis ${tag} is available. Click Update now to install the .deb.`
-          : `Artemis ${tag} is available. Download from https://github.com/lipey1/artemis-desktop/releases/latest`
+          : `Artemis ${tag} is available. Download from https://github.com/lipey1/artemis-agent/releases/latest`
         : undefined,
-      releaseUrl: 'https://github.com/lipey1/artemis-desktop/releases/latest',
+      releaseUrl: 'https://github.com/lipey1/artemis-agent/releases/latest',
       debInstall: IS_LINUX && isDebInstall(process.execPath, process.env)
     }
   } catch (error) {

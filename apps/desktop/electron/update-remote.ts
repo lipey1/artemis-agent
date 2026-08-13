@@ -1,7 +1,7 @@
 /**
  * Pure helpers for choosing a remote URL during passive update checks.
  *
- * A public install can end up with `origin=git@github.com:lipey1/artemis-desktop.git`.
+ * A public install can end up with `origin=git@github.com:lipey1/artemis-agent.git`.
  * If the user's GitHub SSH key is FIDO2/passkey-backed, a background `git fetch
  * origin` triggers an unexplained hardware-touch prompt. For passive checks
  * against the official repo we substitute the public HTTPS `ls-remote` path,
@@ -12,11 +12,11 @@
  * testable without booting Electron (main.ts requires('electron') at load).
  */
 
-const OFFICIAL_REPO_HTTPS_URL = 'https://github.com/lipey1/artemis-desktop.git'
+const OFFICIAL_REPO_HTTPS_URL = 'https://github.com/lipey1/artemis-agent.git'
 /** host/owner/repo form used to compare git remotes (SSH vs HTTPS). */
-const OFFICIAL_REPO_CANONICAL = 'github.com/lipey1/artemis-desktop'
+const OFFICIAL_REPO_CANONICAL = 'github.com/lipey1/artemis-agent'
 /** owner/repo slug for raw.githubusercontent.com and API paths (no host prefix). */
-const OFFICIAL_REPO_SLUG = 'lipey1/artemis-desktop'
+const OFFICIAL_REPO_SLUG = 'lipey1/artemis-agent'
 
 function officialRepoRawUrl(relativePath: string, ref: string): string {
   const segment = String(relativePath || '')

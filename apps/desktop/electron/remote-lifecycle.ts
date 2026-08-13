@@ -200,7 +200,7 @@ async function locateArtemis(ssh, remoteArtemisPath) {
 
   const err: any = new Error(
     'Artemis is not installed on the remote host (could not find a `artemis` executable). ' +
-      'Install it on the remote with:  curl -fsSL https://raw.githubusercontent.com/lipey1/artemis-desktop/main/scripts/install.sh | sh  ' +
+      'Install it on the remote with:  curl -fsSL https://raw.githubusercontent.com/lipey1/artemis-agent/main/scripts/install.sh | sh  ' +
       '— or set the Artemis path explicitly in the SSH connection settings.'
   )
 

@@ -2,11 +2,11 @@
   "name": "artemis",
   "productName": "Artemis",
   "private": true,
-  "version": "0.17.27",
+  "version": "0.17.28",
   "description": "Artemis Desktop. UI source is in apps/desktop.",
   "author": "Artemis / lipey1",
   "license": "MIT",
-  "homepage": "https://github.com/lipey1/artemis-desktop",
+  "homepage": "https://github.com/lipey1/artemis-agent",
   "packageManager": "pnpm@11.21.0",
   "scripts": {
     "dev": "node scripts/run-desktop.mjs dev",

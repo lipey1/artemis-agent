@@ -66,7 +66,11 @@ def _skin_color(key: str, fallback: str) -> str:
 # ASCII Art & Branding
 # =========================================================================
 
-from artemis_cli import __version__ as VERSION, __release_date__ as RELEASE_DATE
+from artemis_cli import (
+    __product_name__ as PRODUCT_NAME,
+    __release_date__ as RELEASE_DATE,
+    __version__ as VERSION,
+)
 
 ARTEMIS_AGENT_LOGO = """[bold #67E8F9] █████╗ ██████╗ ████████╗███████╗███╗   ███╗██╗███████╗[/]
 [bold #22D3EE]██╔══██╗██╔══██╗╚══██╔══╝██╔════╝████╗ ████║██║██╔════╝[/]
@@ -139,8 +143,8 @@ _UPDATE_CHECK_CACHE_SECONDS = 6 * 3600
 # (e.g. nix-built artemis — no local git history to count against).
 UPDATE_AVAILABLE_NO_COUNT = -1
 
-_UPSTREAM_REPO_URL = "https://github.com/lipey1/artemis-desktop.git"
-_OFFICIAL_REPO_CANONICAL = "github.com/lipey1/artemis-desktop"
+_UPSTREAM_REPO_URL = "https://github.com/lipey1/artemis-agent.git"
+_OFFICIAL_REPO_CANONICAL = "github.com/lipey1/artemis-agent"
 
 
 def _canonical_github_remote(url: str | None) -> str:
@@ -286,7 +290,7 @@ def _check_via_local_git(repo_dir: Path) -> Optional[int]:
 
 
 def check_for_updates() -> Optional[int]:
-    """Artemis: compare installed version to lipey1/artemis-desktop releases."""
+    """Artemis: compare installed version to lipey1/artemis-agent releases."""
     artemis_home = get_artemis_home()
     cache_file = artemis_home / ".update_check"
     now = time.time()
@@ -317,22 +321,13 @@ def check_for_updates() -> Optional[int]:
     behind: Optional[int] = None
     try:
         req = urllib.request.Request(
-            "https://api.github.com/repos/lipey1/artemis-desktop/releases/latest",
+            "https://api.github.com/repos/lipey1/artemis-agent/releases/latest",
             headers={"Accept": "application/vnd.github+json", "User-Agent": "Artemis"},
         )
         with urllib.request.urlopen(req, timeout=8) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
         tag = str(payload.get("tag_name") or "").lstrip("v")
-        # Prefer desktop package version when present (Artemis product version).
-        local = ""
-        try:
-            pkg = Path(__file__).resolve().parents[1] / "apps" / "desktop" / "package.json"
-            if pkg.is_file():
-                local = str(json.loads(pkg.read_text(encoding="utf-8")).get("version") or "")
-        except Exception:
-            local = ""
-        if not local:
-            local = str(VERSION).lstrip("v")
+        local = str(VERSION).lstrip("v")
         if tag and local:
             behind = UPDATE_AVAILABLE_NO_COUNT if _parse_ver(tag) > _parse_ver(local) else 0
     except Exception:
@@ -474,7 +469,7 @@ def _compute_git_banner_state(repo_dir: Optional[Path] = None) -> Optional[dict]
     return {"upstream": upstream, "local": local, "ahead": max(ahead, 0)}
 
 
-_RELEASE_URL_BASE = "https://github.com/lipey1/artemis-desktop/releases/tag"
+_RELEASE_URL_BASE = "https://github.com/lipey1/artemis-agent/releases/tag"
 _latest_release_cache: Optional[tuple] = None  # (tag, url) once resolved
 
 
@@ -524,7 +519,7 @@ def get_latest_release_tag(repo_dir: Optional[Path] = None) -> Optional[tuple]:
 
 def format_banner_version_label() -> str:
     """Return the version label shown in the startup banner title."""
-    base = f"Artemis v{VERSION} ({RELEASE_DATE})"
+    base = f"{PRODUCT_NAME} v{VERSION} ({RELEASE_DATE})"
     state = get_git_banner_state()
     if not state:
         return base

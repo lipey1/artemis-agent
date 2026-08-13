@@ -803,7 +803,7 @@ def _update_via_zip(args):
         )
         _m().sys.exit(1)
     zip_url = (
-        f"https://github.com/lipey1/artemis-desktop/archive/refs/heads/{branch}.zip"
+        f"https://github.com/lipey1/artemis-agent/archive/refs/heads/{branch}.zip"
     )
 
     print("→ Downloading latest version...")
@@ -1467,15 +1467,15 @@ def _discard_stashed_changes(
     return True
 
 OFFICIAL_REPO_URLS = {
-    "https://github.com/lipey1/artemis-desktop.git",
-    "git@github.com:lipey1/artemis-desktop.git",
-    "https://github.com/lipey1/artemis-desktop",
-    "git@github.com:lipey1/artemis-desktop",
+    "https://github.com/lipey1/artemis-agent.git",
+    "git@github.com:lipey1/artemis-agent.git",
+    "https://github.com/lipey1/artemis-agent",
+    "git@github.com:lipey1/artemis-agent",
 }
 
-OFFICIAL_REPO_URL = "https://github.com/lipey1/artemis-desktop.git"
+OFFICIAL_REPO_URL = "https://github.com/lipey1/artemis-agent.git"
 
-ARTEMIS_RELEASES_URL = "https://github.com/lipey1/artemis-desktop/releases"
+ARTEMIS_RELEASES_URL = "https://github.com/lipey1/artemis-agent/releases"
 
 
 def _artemis_blocks_upstream_git_update() -> bool:
@@ -1624,7 +1624,7 @@ def _sync_with_upstream_if_needed(git_cmd: list[str], cwd: Path) -> None:
             print("→ Adding upstream remote...")
             if _add_upstream_remote(git_cmd, cwd):
                 print(
-                    "  ✓ Added upstream: https://github.com/lipey1/artemis-desktop.git"
+                    "  ✓ Added upstream: https://github.com/lipey1/artemis-agent.git"
                 )
                 has_upstream = True
             else:
@@ -1632,7 +1632,7 @@ def _sync_with_upstream_if_needed(git_cmd: list[str], cwd: Path) -> None:
                 return
         else:
             print(
-                "  Skipped. Run 'git remote add upstream https://github.com/lipey1/artemis-desktop.git' to add later."
+                "  Skipped. Run 'git remote add upstream https://github.com/lipey1/artemis-agent.git' to add later."
             )
             _mark_skip_upstream_prompt()
             return
@@ -3979,7 +3979,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
         else:
             print("✗ Not a git repository. Please reinstall:")
             print(
-                "  curl -fsSL https://raw.githubusercontent.com/lipey1/artemis-desktop/main/scripts/install.sh | bash"
+                "  curl -fsSL https://raw.githubusercontent.com/lipey1/artemis-agent/main/scripts/install.sh | bash"
             )
             sys.exit(1)
 

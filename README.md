@@ -6,7 +6,7 @@ skills, gateway, and local config in one shell.
 Companion app: **[Artemis Mobile](https://github.com/lipey1/artemis-mobile)** (Flutter client for Open WebUI and Artemis agents).
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Release](https://img.shields.io/github/v/release/lipey1/artemis-desktop?include_prereleases)](https://github.com/lipey1/artemis-desktop/releases)
+[![Release](https://img.shields.io/github/v/release/lipey1/artemis-agent?include_prereleases)](https://github.com/lipey1/artemis-agent/releases)
 
 ## What you get
 
@@ -15,7 +15,7 @@ Companion app: **[Artemis Mobile](https://github.com/lipey1/artemis-mobile)** (F
 - **Identity**: `SOUL.md` presents the assistant as Artemis
 - **Home directory**: `~/.artemis` (config, logs, memories, skills)
 - **Installers** for Linux, macOS, and Windows on
-  [Releases](https://github.com/lipey1/artemis-desktop/releases/latest)
+  [Releases](https://github.com/lipey1/artemis-agent/releases/latest)
 - **Mobile companion**: [Artemis Mobile](https://github.com/lipey1/artemis-mobile)
 
 Engine install tree: `/usr/local/lib/artemis-agent` (or `~/.artemis/artemis-agent`).
@@ -27,10 +27,10 @@ This repository contains the desktop UI (`apps/desktop`), shared types, and the 
 ## Install (Linux / macOS / Windows)
 
 Download the asset for your OS from the latest
-[GitHub Release](https://github.com/lipey1/artemis-desktop/releases/latest).
+[GitHub Release](https://github.com/lipey1/artemis-agent/releases/latest).
 
 Binaries are published on Releases (they are too large for git). Checksums are in
-[`SHA256SUMS`](https://github.com/lipey1/artemis-desktop/releases/latest) on each release.
+[`SHA256SUMS`](https://github.com/lipey1/artemis-agent/releases/latest) on each release.
 
 ### Linux
 
@@ -95,7 +95,7 @@ Windows-safe naming (one lowercase command):
 
 ```bash
 # Install wrapper (once)
-curl -fsSL https://raw.githubusercontent.com/lipey1/artemis-desktop/main/scripts/install-artemis-cli.sh | bash
+curl -fsSL https://raw.githubusercontent.com/lipey1/artemis-agent/main/scripts/install-artemis-cli.sh | bash
 # or copy scripts/artemis from this repo to ~/.local/bin/artemis
 
 export PATH="$HOME/.local/bin:$PATH"
@@ -110,7 +110,7 @@ artemis status
 The CLI uses `~/.artemis` and your `SOUL.md` so the model answers as **Artemis**.
 Do not rely on `Artemis` vs `artemis` case differences (broken on Windows).
 
-Updates check **[lipey1/artemis-desktop releases](https://github.com/lipey1/artemis-desktop/releases/latest)**.
+Updates check **[lipey1/artemis-agent releases](https://github.com/lipey1/artemis-agent/releases/latest)**.
 After branding an engine checkout, run:
 
 ```bash
@@ -256,4 +256,4 @@ ARTEMIS_DESKTOP_APP_NAME=Artemis ./Artemis --no-sandbox --disable-gpu
 ## Contributing / issues
 
 Open issues and pull requests on
-[github.com/lipey1/artemis-desktop](https://github.com/lipey1/artemis-desktop).
+[github.com/lipey1/artemis-agent](https://github.com/lipey1/artemis-agent).

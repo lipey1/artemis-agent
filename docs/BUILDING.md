@@ -82,7 +82,7 @@ pnpm exec electron-builder --mac zip
 
 Publish artifacts via GitHub Releases (binaries exceed git limits).
 
-Current packages: https://github.com/lipey1/artemis-desktop/releases/latest
+Current packages: https://github.com/lipey1/artemis-agent/releases/latest
 
 After building or branding an engine tree, retarget update checks:
 

@@ -6,7 +6,7 @@
  * (Wired into npm test:desktop:platforms in package.json.)
  *
  * Why this matters: a public install can carry
- * origin=git@github.com:lipey1/artemis-desktop.git. A background
+ * origin=git@github.com:lipey1/artemis-agent.git. A background
  * `git fetch origin` then authenticates over SSH and, with a FIDO2/passkey
  * key, triggers an unexplained hardware-touch prompt. isOfficialSshRemote
  * must reliably recognize the official SSH remote (in every URL form,
@@ -30,14 +30,14 @@ import {
 } from './update-remote'
 
 test('canonicalGitHubRemote normalizes SSH and HTTPS forms to the same value', () => {
-  assert.equal(canonicalGitHubRemote('git@github.com:lipey1/artemis-desktop.git'), OFFICIAL_REPO_CANONICAL)
-  assert.equal(canonicalGitHubRemote('git@github.com:lipey1/artemis-desktop'), OFFICIAL_REPO_CANONICAL)
+  assert.equal(canonicalGitHubRemote('git@github.com:lipey1/artemis-agent.git'), OFFICIAL_REPO_CANONICAL)
+  assert.equal(canonicalGitHubRemote('git@github.com:lipey1/artemis-agent'), OFFICIAL_REPO_CANONICAL)
   assert.equal(canonicalGitHubRemote('ssh://git@github.com/NousResearch/artemis-agent.git'), OFFICIAL_REPO_CANONICAL)
-  assert.equal(canonicalGitHubRemote('https://github.com/lipey1/artemis-desktop.git'), OFFICIAL_REPO_CANONICAL)
+  assert.equal(canonicalGitHubRemote('https://github.com/lipey1/artemis-agent.git'), OFFICIAL_REPO_CANONICAL)
   // Case-insensitive: an uppercased owner still canonicalizes to the same repo.
   assert.equal(canonicalGitHubRemote('git@github.com:nousresearch/artemis-agent.git'), OFFICIAL_REPO_CANONICAL)
   // Trailing slashes are stripped.
-  assert.equal(canonicalGitHubRemote('https://github.com/lipey1/artemis-desktop/'), OFFICIAL_REPO_CANONICAL)
+  assert.equal(canonicalGitHubRemote('https://github.com/lipey1/artemis-agent/'), OFFICIAL_REPO_CANONICAL)
 })
 
 test('canonicalGitHubRemote is empty for falsy input', () => {
@@ -47,16 +47,16 @@ test('canonicalGitHubRemote is empty for falsy input', () => {
 })
 
 test('isSshRemote detects scp-like and ssh:// forms only', () => {
-  assert.equal(isSshRemote('git@github.com:lipey1/artemis-desktop.git'), true)
+  assert.equal(isSshRemote('git@github.com:lipey1/artemis-agent.git'), true)
   assert.equal(isSshRemote('ssh://git@github.com/NousResearch/artemis-agent.git'), true)
-  assert.equal(isSshRemote('https://github.com/lipey1/artemis-desktop.git'), false)
+  assert.equal(isSshRemote('https://github.com/lipey1/artemis-agent.git'), false)
   assert.equal(isSshRemote(''), false)
   assert.equal(isSshRemote(null), false)
 })
 
 test('isOfficialSshRemote is true only for the official repo over SSH', () => {
-  assert.equal(isOfficialSshRemote('git@github.com:lipey1/artemis-desktop.git'), true)
-  assert.equal(isOfficialSshRemote('git@github.com:lipey1/artemis-desktop'), true)
+  assert.equal(isOfficialSshRemote('git@github.com:lipey1/artemis-agent.git'), true)
+  assert.equal(isOfficialSshRemote('git@github.com:lipey1/artemis-agent'), true)
   assert.equal(isOfficialSshRemote('ssh://git@github.com/NousResearch/artemis-agent.git'), true)
   // Case-insensitive owner/repo match.
   assert.equal(isOfficialSshRemote('git@github.com:nousresearch/artemis-agent.git'), true)
@@ -70,7 +70,7 @@ test('isOfficialSshRemote does NOT match forks, other hosts, or HTTPS', () => {
   assert.equal(isOfficialSshRemote('git@gitlab.com:NousResearch/artemis-agent.git'), false)
   // HTTPS to the official repo never prompts for SSH/FIDO2, so it keeps the
   // normal fetch path — must not be flagged as an official SSH remote.
-  assert.equal(isOfficialSshRemote('https://github.com/lipey1/artemis-desktop.git'), false)
+  assert.equal(isOfficialSshRemote('https://github.com/lipey1/artemis-agent.git'), false)
   assert.equal(isOfficialSshRemote(''), false)
   assert.equal(isOfficialSshRemote(null), false)
 })
@@ -81,7 +81,7 @@ test('OFFICIAL_REPO_HTTPS_URL canonicalizes to OFFICIAL_REPO_CANONICAL', () => {
 })
 
 test('OFFICIAL_REPO_SLUG is owner/repo without a github.com host prefix', () => {
-  assert.equal(OFFICIAL_REPO_SLUG, 'lipey1/artemis-desktop')
+  assert.equal(OFFICIAL_REPO_SLUG, 'lipey1/artemis-agent')
   assert.doesNotMatch(OFFICIAL_REPO_SLUG, /github\.com/)
 })
 

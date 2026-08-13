@@ -8,7 +8,7 @@ d["name"] = "artemis"
 d["productName"] = "Artemis"
 d["author"] = "Artemis / lipey1"
 d["description"] = "Artemis Desktop - native shell for the Artemis agent."
-d["homepage"] = "https://github.com/lipey1/artemis-desktop"
+d["homepage"] = "https://github.com/lipey1/artemis-agent"
 
 build = d.setdefault("build", {})
 build["productName"] = "Artemis"
