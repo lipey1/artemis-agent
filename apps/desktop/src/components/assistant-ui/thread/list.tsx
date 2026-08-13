@@ -378,7 +378,10 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
   if (budgetSessionKey !== sessionKey) {
     setBudgetSessionKey(sessionKey)
     setHadGroups(hasGroups)
-    setRenderBudget(FIRST_PAINT_BUDGET)
+    // Warm switch: messages already in this commit. Cutting to FIRST_PAINT
+    // then backfilling is the flicker (turns vanish, then older ones pop in).
+    // Cold empty→messages still uses FIRST_PAINT via the hasGroups branch.
+    setRenderBudget(hasGroups ? paneBudget : FIRST_PAINT_BUDGET)
   } else if (hadGroups !== hasGroups) {
     setHadGroups(hasGroups)
 

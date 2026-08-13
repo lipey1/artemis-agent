@@ -172,8 +172,9 @@ interface ChatRuntimeBoundaryProps {
   onEdit: (message: AppendMessage) => Promise<void>
   onReload: (parentId: string | null) => Promise<void>
   onThreadMessagesChange: (messages: readonly ThreadMessage[]) => void
-  /** Route points at an unloaded session — render empty until resume swaps in
-   *  the new transcript, so the previous session's messages don't linger. */
+  /** When true, render an empty transcript. Kept for tests / special surfaces;
+   *  ChatView no longer blanks on route mismatch (that flicker is worse than
+   *  a brief linger of the outgoing session). */
   suppressMessages: boolean
 }
 
@@ -394,12 +395,6 @@ export const ChatView = memo(function ChatView({
   const routedSessionId = isPrimary ? routeSessionId(location.pathname) : selectedSessionId
   const isRoutedSessionView = Boolean(routedSessionId)
 
-  // The URL points at a session the store hasn't loaded yet (sidebar / cmd-K /
-  // direct nav). Derived in render so the swap reads instantly: the same frame
-  // the id changes we drop the old transcript and show the loader, instead of
-  // waiting for the resume effect (which paints a frame later) to clear them.
-  const routeSessionMismatch = isRoutedSessionView && routedSessionId !== selectedSessionId
-
   // The compact new-session pop-out skips the wordmark/tagline intro — it's a
   // scratch window, not the full-height empty state.
   const showIntro =
@@ -412,10 +407,10 @@ export const ChatView = memo(function ChatView({
     messagesEmpty
 
   // Session is still loading if the route references a session we haven't
-  // resumed yet. Once `activeSessionId` is set (runtime has resumed), the
-  // session exists — even if it has zero messages (a brand-new routed
-  // session). The flicker where `busy` flips true briefly during hydrate
-  // is handled by `threadLoadingState`'s last-visible-user gate.
+  // resumed yet AND there is nothing to show. Once `activeSessionId` is set
+  // (runtime has resumed), the session exists — even if it has zero messages
+  // (a brand-new routed session). The flicker where `busy` flips true briefly
+  // during hydrate is handled by `threadLoadingState`'s last-visible-user gate.
   //
   // resumeExhausted: the bounded auto-retry in use-route-resume gave up on this
   // routed session (gateway RPC + REST fallback failed through every attempt).
@@ -424,14 +419,13 @@ export const ChatView = memo(function ChatView({
   // session can't blank the current one.
   const resumeExhausted = isPrimary && isRoutedSessionView && resumeExhaustedSessionId === routedSessionId
 
-  const loadingSession =
-    !resumeExhausted && isRoutedSessionView && (routeSessionMismatch || (messagesEmpty && !activeSessionId))
+  const loadingSession = !resumeExhausted && isRoutedSessionView && messagesEmpty && !activeSessionId
 
   const threadLoading = threadLoadingState(loadingSession, busy, awaitingResponse, lastVisibleIsUser)
-  // Hide the composer in the exhausted error state too: there's no live runtime
-  // to send to until a retry rebinds one. Watch windows are pure spectators of a
-  // subagent run driven elsewhere — no composer, transcript is read-only.
-  const showChatBar = !loadingSession && !resumeExhausted && !isWatchWindow()
+  // Hide the composer only when there is no runtime to send to (exhausted
+  // resume) or this surface is a watch window. Keep it mounted during session
+  // load so the transcript height does not jump.
+  const showChatBar = !resumeExhausted && !isWatchWindow()
   const threadKey = selectedSessionId || activeSessionId || (isRoutedSessionView ? location.pathname : 'new')
 
   const modelOptionsQuery = useQuery<ModelOptionsResponse>({
@@ -542,7 +536,7 @@ export const ChatView = memo(function ChatView({
         onEdit={onEdit}
         onReload={onReload}
         onThreadMessagesChange={onThreadMessagesChange}
-        suppressMessages={routeSessionMismatch}
+        suppressMessages={false}
       >
         <div
           className="relative min-h-0 max-w-full flex-1 overflow-hidden bg-(--ui-chat-surface-background) contain-[layout_paint]"
