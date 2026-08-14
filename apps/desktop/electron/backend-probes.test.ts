@@ -60,6 +60,8 @@ test('artemis runtime import probe checks config dependencies', () => {
   // Half-renamed Hermes leftovers must fail the probe instead of launching.
   assert.match(probe, /\bis_nous_artemis_non_agentic\b/)
   assert.match(probe, /_ARTEMIS_PROVIDER_ENV_BLOCKLIST/)
+  // Incomplete agent swaps that omit tui_gateway must fail usable-runtime.
+  assert.match(probe, /\bimport tui_gateway\.ws\b/)
 })
 
 test('explicit Artemis override is authoritative', () => {

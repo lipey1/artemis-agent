@@ -141,7 +141,10 @@ function probeGatewayWebSocket<T>(
         // server-side Host/Origin guard tripped after accept).
         finish({
           ok: false,
-          reason: closeReason(event, 'The gateway accepted the connection then closed it (credential rejected?).')
+          reason: closeReason(
+            event,
+            'The gateway accepted the connection then closed it (auth or handler failure?).'
+          )
         })
 
         return

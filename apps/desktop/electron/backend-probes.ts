@@ -122,13 +122,16 @@ function execProbeSync(
 function artemisRuntimeImportProbe() {
   // Also exercise symbols that half-renamed Hermes→Artemis trees break on:
   // cli/model_switch and tools.environments.* ImportErrors (#Hermes leftovers).
+  // Import tui_gateway.ws so incomplete agent swaps missing the WS package fail
+  // the usable-runtime probe instead of looking installed until /api/ws dies.
   return [
     'import yaml',
     'import dotenv',
     'import artemis_cli.config',
     'from artemis_cli.model_switch import is_nous_artemis_non_agentic',
     'from tools.environments.local import _ARTEMIS_PROVIDER_ENV_BLOCKLIST',
-    'from tools.environments.docker import _ARTEMIS_PROVIDER_ENV_BLOCKLIST'
+    'from tools.environments.docker import _ARTEMIS_PROVIDER_ENV_BLOCKLIST',
+    'import tui_gateway.ws'
   ].join('; ')
 }
 

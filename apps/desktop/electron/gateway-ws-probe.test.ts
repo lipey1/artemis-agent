@@ -98,7 +98,7 @@ test('probe fails when the gateway accepts then immediately closes (auth rejecte
   instances[0].emit('close', { code: 4403, reason: 'forbidden' })
   const result = await promise
   assert.equal(result.ok, false)
-  assert.match(result.reason, /credential rejected/)
+  assert.match(result.reason, /auth or handler failure/)
   assert.match(result.reason, /4403/)
   assert.match(result.reason, /forbidden/)
 })

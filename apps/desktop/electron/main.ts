@@ -2068,11 +2068,16 @@ function looksLikeDesktopAppBinary(commandPath) {
 }
 
 function isArtemisSourceRoot(root) {
+  // tui_gateway/ws.py is required: Desktop probes /api/ws at boot, and a tree
+  // missing that package still looks "installed" (artemis_cli + gateway present)
+  // while the WS handler ImportErrors and gets misreported as a session-token
+  // rejection.
   return (
     directoryExists(root) &&
     fileExists(path.join(root, 'artemis_cli', 'main.py')) &&
     fileExists(path.join(root, 'plugins', 'memory', 'config_schema.py')) &&
-    fileExists(path.join(root, 'gateway', 'status.py'))
+    fileExists(path.join(root, 'gateway', 'status.py')) &&
+    fileExists(path.join(root, 'tui_gateway', 'ws.py'))
   )
 }
 
@@ -8106,14 +8111,14 @@ async function spawnPoolBackend(profile, entry) {
 
   entry.token = authToken
 
-  // Verify the WebSocket session token before declaring backend ready.
-  // HTTP /api/status can pass while WS auth fails (separate transport, separate guards).
+  // Probe /api/ws before declaring backend ready. HTTP /api/status can pass while
+  // the WS handler fails to load (e.g. missing tui_gateway) or auth/guards reject.
   const wsUrl = `ws://127.0.0.1:${port}/api/ws?token=${encodeURIComponent(authToken)}`
   const wsProbe = await probeGatewayWebSocket(wsUrl, { WebSocketImpl: globalThis.WebSocket })
 
   if (!wsProbe.ok) {
     throw new Error(
-      `Artemis backend for profile "${profile}" is HTTP-reachable but the WebSocket (/api/ws) rejected the session token: ${wsProbe.reason}`
+      `Artemis backend for profile "${profile}" is HTTP-reachable but the WebSocket (/api/ws) probe failed: ${wsProbe.reason}`
     )
   }
 
@@ -8434,13 +8439,14 @@ async function startArtemis() {
       rememberLog
     })
 
-    // Verify the WebSocket session token before declaring backend ready.
+    // Probe /api/ws before declaring backend ready (handler load or auth can fail
+    // even when HTTP /api/status already succeeded).
     const wsUrl = `ws://127.0.0.1:${port}/api/ws?token=${encodeURIComponent(authToken)}`
     const wsProbe = await probeGatewayWebSocket(wsUrl, { WebSocketImpl: globalThis.WebSocket })
 
     if (!wsProbe.ok) {
       throw new Error(
-        `Local Artemis backend is HTTP-reachable but the WebSocket (/api/ws) rejected the session token: ${wsProbe.reason}`
+        `Local Artemis backend is HTTP-reachable but the WebSocket (/api/ws) probe failed: ${wsProbe.reason}`
       )
     }
 
