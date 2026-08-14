@@ -137,6 +137,69 @@ def write_artemis_cmd_shim(venv_python: Path) -> Path:
     return dest
 
 
+def _resolve_uv() -> Optional[str]:
+    try:
+        from artemis_cli.managed_uv import ensure_uv
+
+        found = ensure_uv()
+        if found:
+            return str(found)
+    except Exception:
+        pass
+    return shutil.which("uv")
+
+
+def _run_captured(cmd: list[str], *, cwd: str, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    """Run a helper without leaking stderr into the PowerShell update window.
+
+    ``desktop-update.ps1`` pipes ``2>&1``. A missing ``pip`` module would
+    otherwise show up as a red ``NativeCommandError`` even when the update
+    continues and the GUI installer succeeds.
+    """
+    return subprocess.run(
+        cmd,
+        cwd=cwd,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+
+
+def _install_editable_engine(python: Path, root: Path, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    """uv pip, then pip, then ensurepip + pip. Windows ``uv venv`` has no pip."""
+    venv_root = python.parent.parent
+    env = {**env, "VIRTUAL_ENV": str(venv_root)}
+    cwd = str(root)
+    python_bin = str(python)
+
+    uv_bin = _resolve_uv()
+    if uv_bin:
+        completed = _run_captured(
+            [uv_bin, "pip", "install", "--python", python_bin, "-e", cwd, "-q"],
+            cwd=cwd,
+            env=env,
+        )
+        if completed.returncode == 0:
+            return completed
+
+    probe = _run_captured([python_bin, "-m", "pip", "--version"], cwd=cwd, env=env)
+    if probe.returncode != 0:
+        _run_captured(
+            [python_bin, "-m", "ensurepip", "--upgrade", "--default-pip"],
+            cwd=cwd,
+            env=env,
+        )
+
+    return _run_captured(
+        [python_bin, "-m", "pip", "install", "-e", cwd, "-q"],
+        cwd=cwd,
+        env=env,
+    )
+
+
 def refresh_cli_entrypoints(root: Path) -> None:
     """Reinstall the editable engine so ``artemis.exe`` imports ``artemis_cli``."""
     is_win = sys.platform.startswith("win")
@@ -147,12 +210,11 @@ def refresh_cli_entrypoints(root: Path) -> None:
     env = os.environ.copy()
     existing = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = str(root) if not existing else f"{root}{os.pathsep}{existing}"
-    subprocess.run(
-        [str(python), "-m", "pip", "install", "-e", str(root), "-q"],
-        cwd=str(root),
-        env=env,
-        check=False,
-    )
+    completed = _install_editable_engine(python, root, env)
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout or "unknown error").strip().splitlines()
+        hint = detail[-1] if detail else "unknown error"
+        print(f"! CLI refresh skipped ({hint}). Engine files are already updated.")
     if is_win:
         write_artemis_cmd_shim(python)
 
@@ -193,9 +255,28 @@ def _seed_skills(root: Path) -> None:
         print(f"! Could not seed bundled skills: {exc}")
 
 
+def _windows_detached_flags() -> int:
+    """DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP.
+
+    The silent NSIS installer may launch Artemis when it finishes. If that
+    child inherits this console, the update window stays open and closing it
+    kills the GUI.
+    """
+    if not sys.platform.startswith("win"):
+        return 0
+    return 0x00000008 | 0x00000200
+
+
 def _run_windows_installer(installer: Path) -> int:
     _progress(f"Installing {installer.name} (silent)")
-    completed = subprocess.run([str(installer), "/S"], check=False)
+    completed = subprocess.run(
+        [str(installer), "/S"],
+        check=False,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        creationflags=_windows_detached_flags(),
+    )
     return int(completed.returncode or 0)
 
 

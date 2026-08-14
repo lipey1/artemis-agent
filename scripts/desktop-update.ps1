@@ -107,13 +107,26 @@ if ($code -eq 0) {
   Write-UpdateStatus "Update finished with exit $code." "Red"
 }
 
-Start-Sleep -Seconds 3
-$artemisRunning = Get-Process -Name "Artemis" -ErrorAction SilentlyContinue
-if ($RelaunchExe -and (Test-Path $RelaunchExe) -and -not $artemisRunning) {
+Start-Sleep -Seconds 1
+
+function Start-DetachedGui([string]$Exe) {
+  # `cmd start` creates a process that is NOT attached to this console.
+  # `Start-Process` from a visible PowerShell lets Electron AttachConsole,
+  # so this window stays open and closing it kills Artemis.
+  $dir = Split-Path -Parent $Exe
+  $exeArg = [string]$Exe
+  $dirArg = [string]$dir
+  cmd.exe /d /s /c "start `"`" /D `"$dirArg`" `"$exeArg`"" | Out-Null
+}
+
+if ($RelaunchExe -and (Test-Path -LiteralPath $RelaunchExe)) {
+  # NSIS runAfterFinish may already have started a console-attached copy.
+  Get-Process -Name "Artemis" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+  Start-Sleep -Milliseconds 600
   Write-UpdateStatus "Restarting Artemis..." "Cyan"
-  Start-Process -FilePath $RelaunchExe
+  Start-DetachedGui $RelaunchExe
 } else {
-  Write-UpdateLog "skip relaunch (running=$([bool]$artemisRunning))"
+  Write-UpdateLog "skip relaunch (missing exe)"
 }
 
 try {
@@ -125,5 +138,5 @@ try {
   }
 } catch {}
 
-Start-Sleep -Seconds 2
+Start-Sleep -Seconds 1
 exit $(if ($null -eq $code) { 0 } else { $code })
