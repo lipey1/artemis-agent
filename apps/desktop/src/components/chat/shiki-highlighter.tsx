@@ -52,6 +52,12 @@ const EST_LINE_PX = 16
 // entry chunk — it loads on the first highlighted code block, not at boot.
 const ShikiBlock = lazy(() => import('./shiki-block'))
 
+/** Warm the shiki chunk during idle time so the first code fence does not
+ *  swap plain `<pre>` for highlighted tokens after the transcript is up. */
+export function prefetchShikiHighlighter(): void {
+  void import('./shiki-block')
+}
+
 /** Drop-in ShikiHighlighter that suspends on first use and renders the code
  *  as plain preformatted text until the shiki chunk arrives. */
 export const LazyShiki: FC<ComponentProps<typeof ShikiHighlighter>> = props => (

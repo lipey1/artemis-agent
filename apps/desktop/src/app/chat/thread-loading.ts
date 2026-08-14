@@ -29,3 +29,25 @@ export function threadLoadingState(
 
   return undefined
 }
+
+/** Opaque cover over a COLD session paint (empty → messages → first-paint
+ *  backfill → scroll settle). Warm switches already have messages in the same
+ *  commit and must stay uncovered. An empty chat that finished loading is
+ *  also uncovered, so the first typed turn is not treated as a resume. */
+export function threadColdCover(input: {
+  backfillDone: boolean
+  cold: boolean
+  hasGroups: boolean
+  loadSettled: boolean
+  sessionLoading: boolean
+}): boolean {
+  if (input.sessionLoading) {
+    return true
+  }
+
+  if (!input.cold || !input.hasGroups) {
+    return false
+  }
+
+  return !input.loadSettled || !input.backfillDone
+}

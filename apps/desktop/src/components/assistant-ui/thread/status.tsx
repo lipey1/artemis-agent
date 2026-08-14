@@ -102,13 +102,18 @@ function useStatusHint(compacting: boolean, drafting: DraftingTool | null): stri
   return revealed && name ? toolPresentVerb(name) : ''
 }
 
-export const CenteredThreadSpinner: FC = () => {
+export const CenteredThreadSpinner: FC<{ filled?: boolean }> = ({ filled = false }) => {
   const { t } = useI18n()
 
   return (
     <div
       aria-label={t.assistant.thread.loadingSession}
-      className="pointer-events-none absolute inset-0 z-1 grid place-items-center"
+      className={cn(
+        'absolute inset-0 z-1 grid place-items-center',
+        filled
+          ? 'pointer-events-auto bg-(--ui-chat-surface-background)'
+          : 'pointer-events-none'
+      )}
       role="status"
     >
       <Loader

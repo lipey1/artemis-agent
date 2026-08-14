@@ -100,8 +100,13 @@ def engine_root() -> Path:
     return get_artemis_home() / "artemis-agent"
 
 
+def _progress(message: str) -> None:
+    """ASCII prefix so Windows consoles (CP850) do not turn `→` into `ÔåÆ`."""
+    print(f"* {message}")
+
+
 def _download(url: str, dest: Path, label: str) -> None:
-    print(f"→ Downloading {label}")
+    _progress(f"Downloading {label}")
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(req, timeout=120) as resp, dest.open("wb") as out:
         shutil.copyfileobj(resp, out)
@@ -151,23 +156,23 @@ def _seed_skills(root: Path) -> None:
 
         ensure_bundled_skills(quiet=False)
     except Exception as exc:
-        print(f"⚠ Could not seed bundled skills: {exc}")
+        print(f"! Could not seed bundled skills: {exc}")
 
 
 def _run_windows_installer(installer: Path) -> int:
-    print(f"→ Installing {installer.name} (silent)")
+    _progress(f"Installing {installer.name} (silent)")
     completed = subprocess.run([str(installer), "/S"], check=False)
     return int(completed.returncode or 0)
 
 
 def _run_posix_installer(installer: Path) -> int:
     if installer.suffix == ".deb":
-        print(f"→ Installing {installer.name} with dpkg")
+        _progress(f"Installing {installer.name} with dpkg")
         completed = subprocess.run(["sudo", "dpkg", "-i", str(installer)], check=False)
         return int(completed.returncode or 0)
     mode = installer.stat().st_mode
     installer.chmod(mode | 0o111)
-    print(f"→ Launching {installer.name}")
+    _progress(f"Launching {installer.name}")
     if sys.platform == "darwin":
         completed = subprocess.run(["open", str(installer)], check=False)
     else:
@@ -220,7 +225,7 @@ def apply_github_release_update(*, force: bool = False) -> int:
         print(f"Artemis {local} is up to date.")
         return 0
 
-    print(f"→ Updating Artemis {local} -> {tag}")
+    _progress(f"Updating Artemis {local} -> {tag}")
     print(f"  {GITHUB_RELEASES_PAGE}")
 
     root = engine_root()
@@ -231,11 +236,11 @@ def apply_github_release_update(*, force: bool = False) -> int:
             try:
                 _download(zip_url, src_zip, f"source {tag}")
                 _overlay_engine_from_zip(src_zip, root)
-                print(f"  ✓ Engine refreshed at {root}")
+                print(f"  OK Engine refreshed at {root}")
             except (urllib.error.URLError, OSError, zipfile.BadZipFile) as exc:
-                print(f"⚠ Engine source download failed: {exc}")
+                print(f"! Engine source download failed: {exc}")
         else:
-            print("⚠ Release has no source zip; engine files were not refreshed.")
+            print("! Release has no source zip; engine files were not refreshed.")
 
         _seed_skills(root)
 
@@ -266,5 +271,5 @@ def apply_github_release_update(*, force: bool = False) -> int:
             print(f"You can run it manually: {installer}")
             return code
 
-    print(f"✓ Artemis {tag} installed. Reopen Desktop if it did not restart.")
+    print(f"OK Artemis {tag} installed. Reopen Desktop if it did not restart.")
     return 0

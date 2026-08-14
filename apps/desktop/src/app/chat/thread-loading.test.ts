@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { ChatMessage } from '@/lib/chat-messages'
 
-import { lastVisibleMessageIsUser, threadLoadingState } from './thread-loading'
+import { lastVisibleMessageIsUser, threadColdCover, threadLoadingState } from './thread-loading'
 
 function message(id: string, role: ChatMessage['role'], hidden = false): ChatMessage {
   return {
@@ -30,5 +30,30 @@ describe('thread loading state', () => {
 
     expect(lastVisibleMessageIsUser(messages)).toBe(false)
     expect(threadLoadingState(false, true, true, lastVisibleMessageIsUser(messages))).toBeUndefined()
+  })
+})
+
+describe('thread cold cover', () => {
+  const settled = {
+    backfillDone: true,
+    cold: true,
+    hasGroups: true,
+    loadSettled: true,
+    sessionLoading: false
+  }
+
+  it('covers while the routed session is still hydrating', () => {
+    expect(threadColdCover({ ...settled, hasGroups: false, sessionLoading: true })).toBe(true)
+  })
+
+  it('covers a cold transcript until settle and backfill finish', () => {
+    expect(threadColdCover({ ...settled, loadSettled: false })).toBe(true)
+    expect(threadColdCover({ ...settled, backfillDone: false })).toBe(true)
+    expect(threadColdCover(settled)).toBe(false)
+  })
+
+  it('does not cover a warm switch or an empty finished chat', () => {
+    expect(threadColdCover({ ...settled, cold: false, loadSettled: false })).toBe(false)
+    expect(threadColdCover({ ...settled, hasGroups: false })).toBe(false)
   })
 })

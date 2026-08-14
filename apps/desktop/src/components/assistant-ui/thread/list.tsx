@@ -17,6 +17,7 @@ import {
 } from 'react'
 import { type GetTargetScrollTop, useStickToBottom } from 'use-stick-to-bottom'
 
+import { threadColdCover } from '@/app/chat/thread-loading'
 import { useI18n } from '@/i18n'
 import { messagePaintWeight } from '@/lib/render-weight'
 import { cn } from '@/lib/utils'
@@ -32,6 +33,7 @@ import { isSecondaryWindow } from '@/store/windows'
 
 import { MessageRenderBoundary } from '../message-render-boundary'
 
+import { CenteredThreadSpinner } from './status'
 import { resolveShowEarlierAction, useTranscriptWindow } from './transcript-window'
 
 type ThreadMessageComponents = ComponentProps<typeof ThreadPrimitive.MessageByIndex>['components']
@@ -121,6 +123,7 @@ interface ThreadMessageListProps {
   emptyPlaceholder?: ReactNode
   loadingIndicator?: ReactNode
   sessionKey?: string | null
+  sessionLoading?: boolean
 }
 
 // Group each user message with the assistant turn(s) that follow it so the
@@ -309,7 +312,8 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
   components,
   emptyPlaceholder,
   loadingIndicator,
-  sessionKey
+  sessionKey,
+  sessionLoading = false
 }) => {
   // TWO signatures, deliberately split. The STRUCTURAL one (ids/roles/count)
   // changes only when messages are added/removed/swapped — it keys the error
@@ -374,6 +378,8 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
   const hasGroups = groups.length > 0
   const [budgetSessionKey, setBudgetSessionKey] = useState(sessionKey)
   const [hadGroups, setHadGroups] = useState(hasGroups)
+  const [cold, setCold] = useState(() => !hasGroups)
+  const [loadSettled, setLoadSettled] = useState(!hasGroups)
 
   if (budgetSessionKey !== sessionKey) {
     setBudgetSessionKey(sessionKey)
@@ -382,11 +388,14 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
     // then backfilling is the flicker (turns vanish, then older ones pop in).
     // Cold empty→messages still uses FIRST_PAINT via the hasGroups branch.
     setRenderBudget(hasGroups ? paneBudget : FIRST_PAINT_BUDGET)
+    setCold(!hasGroups)
+    setLoadSettled(false)
   } else if (hadGroups !== hasGroups) {
     setHadGroups(hasGroups)
 
     if (hasGroups) {
       setRenderBudget(FIRST_PAINT_BUDGET)
+      setLoadSettled(false)
     }
   }
 
@@ -573,6 +582,9 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
     const el = scrollRef.current
 
     if (!el) {
+      loadSettledRef.current = true
+      setLoadSettled(true)
+
       return
     }
 
@@ -611,6 +623,7 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
       if (stableFrames >= 2 || ++frame > 15) {
         void scrollToBottom('instant')
         loadSettledRef.current = true
+        setLoadSettled(true)
 
         return
       }
@@ -664,6 +677,26 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
   // changed (measured live: 865 wasted Block renders in one drag, walked to
   // "MessageRenderBoundary (children only)" by explain()). With it, React
   // bails out on element identity and a scroll flip re-renders nothing below.
+  const covering = threadColdCover({
+    backfillDone: renderBudget >= paneBudget,
+    cold,
+    hasGroups,
+    loadSettled,
+    sessionLoading
+  })
+
+  useEffect(() => {
+    if (!cold || sessionLoading) {
+      return
+    }
+
+    if (hasGroups && (!loadSettled || renderBudget < paneBudget)) {
+      return
+    }
+
+    setCold(false)
+  }, [cold, hasGroups, loadSettled, paneBudget, renderBudget, sessionLoading])
+
   const rows = useMemo(
     () =>
       visibleGroups.map((group, indexInVisible) => (
@@ -740,6 +773,7 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
           </div>
         )}
       </div>
+      {covering && <CenteredThreadSpinner filled />}
     </div>
   )
 }

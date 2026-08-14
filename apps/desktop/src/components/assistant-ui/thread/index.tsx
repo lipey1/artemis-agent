@@ -1,14 +1,15 @@
-import { createContext, memo, useCallback, useContext, useMemo, useRef, useState } from 'react'
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 
 import { AssistantMessage } from '@/components/assistant-ui/thread/assistant-message'
 import { ThreadMessageList } from '@/components/assistant-ui/thread/list'
-import { BackgroundResumeNotice, CenteredThreadSpinner } from '@/components/assistant-ui/thread/status'
+import { BackgroundResumeNotice } from '@/components/assistant-ui/thread/status'
 import { SystemMessage } from '@/components/assistant-ui/thread/system-message'
 import { ThreadTimeline } from '@/components/assistant-ui/thread/timeline'
 import { type RestoreMessageTarget } from '@/components/assistant-ui/thread/types'
 import { UserEditComposer } from '@/components/assistant-ui/thread/user-edit-composer'
 import { UserMessage } from '@/components/assistant-ui/thread/user-message'
 import { Intro, type IntroProps } from '@/components/chat/intro'
+import { prefetchShikiHighlighter } from '@/components/chat/shiki-highlighter'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import type { ArtemisGateway } from '@/artemis'
 import { useI18n } from '@/i18n'
@@ -68,6 +69,20 @@ export const Thread = memo(function Thread({
 }: ThreadProps) {
   const { t } = useI18n()
   const copy = t.assistant.thread
+
+  useEffect(() => {
+    const prefetch = () => prefetchShikiHighlighter()
+
+    if (typeof window.requestIdleCallback === 'function') {
+      const idleId = window.requestIdleCallback(prefetch, { timeout: 1500 })
+
+      return () => window.cancelIdleCallback(idleId)
+    }
+
+    const timeoutId = window.setTimeout(prefetch, 400)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [])
 
   const [restoreConfirmTarget, setRestoreConfirmTarget] = useState<
     (RestoreMessageTarget & { messageId: string }) | null
@@ -169,8 +184,8 @@ export const Thread = memo(function Thread({
           emptyPlaceholder={emptyPlaceholder}
           loadingIndicator={loadingIndicator}
           sessionKey={sessionKey}
+          sessionLoading={loading === 'session'}
         />
-        {loading === 'session' && <CenteredThreadSpinner />}
         <ThreadTimeline />
         <ConfirmDialog
           confirmLabel={copy.restoreConfirm}

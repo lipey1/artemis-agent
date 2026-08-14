@@ -8,6 +8,17 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
+
+# PowerShell 5.1 on pt-BR Windows uses OEM CP850. Python writes UTF-8
+# (PYTHONUTF8=1), so `→` shows up as `ÔåÆ` unless this console is UTF-8 too.
+try {
+  cmd.exe /d /c "chcp 65001 >NUL"
+  $utf8 = New-Object System.Text.UTF8Encoding $false
+  [Console]::OutputEncoding = $utf8
+  [Console]::InputEncoding = $utf8
+  $OutputEncoding = $utf8
+} catch {}
+
 $homeDir = if ($env:ARTEMIS_HOME) { $env:ARTEMIS_HOME } elseif ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA "artemis" } else { Join-Path $env:USERPROFILE ".artemis" }
 $logDir = Join-Path $homeDir "logs"
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
