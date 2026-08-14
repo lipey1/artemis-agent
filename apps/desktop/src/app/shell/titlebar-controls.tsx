@@ -181,9 +181,9 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
     {
       active: listenGatewayRunning,
       icon: listenGatewayRunning ? (
-        <Wifi className="size-[0.87rem]" size={14} stroke={1.75} />
-      ) : (
         <WifiOff className="size-[0.87rem]" size={14} stroke={1.75} />
+      ) : (
+        <Wifi className="size-[0.87rem]" size={14} stroke={1.75} />
       ),
       id: 'listen-gateway',
       label: t.titlebar.gatewayListen,
