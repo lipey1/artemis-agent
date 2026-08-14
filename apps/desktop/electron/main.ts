@@ -229,6 +229,11 @@ import { loadWindowUrlWithRetry, reloadWindowContents } from './load-window-url'
 import { installWindowRendererLifecycle } from './window-renderer-lifecycle'
 import { createWindowRevealController } from './window-reveal'
 import {
+  getListenGatewayStatus,
+  startListenGateway,
+  stopListenGateway
+} from './listen-gateway'
+import {
   bindGeometryPersistence,
   computeWindowOptions,
   debounce,
@@ -2296,6 +2301,62 @@ function findGitBash() {
 
 function getVenvPython(venvRoot) {
   return path.join(venvRoot, IS_WINDOWS ? path.join('Scripts', 'python.exe') : path.join('bin', 'python'))
+}
+
+function createListenGatewayIo() {
+  const engineRoot = resolveUpdateRoot()
+  const engineVenvPython = getVenvPython(path.join(engineRoot, 'venv'))
+  const pythonPath = fileExists(engineVenvPython) ? engineVenvPython : getVenvPython(VENV_ROOT)
+
+  return {
+    engineRoot,
+    pythonPath,
+    artemisHome: ARTEMIS_HOME,
+    runCli: (args, extraEnv) =>
+      new Promise((resolve, reject) => {
+        if (!fileExists(pythonPath)) {
+          reject(new Error('Python engine is not installed.'))
+
+          return
+        }
+
+        const child = spawn(
+          pythonPath,
+          ['-u', ...args],
+          hiddenWindowsChildOptions({
+            cwd: engineRoot,
+            env: {
+              ...process.env,
+              ...extraEnv,
+              PYTHONPATH: [extraEnv.PYTHONPATH, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter),
+              PYTHONUTF8: process.env.PYTHONUTF8 ?? '1'
+            },
+            stdio: ['ignore', 'pipe', 'pipe']
+          })
+        )
+        let stdout = ''
+        let stderr = ''
+        const timer = setTimeout(() => {
+          child.kill()
+          reject(new Error('Gateway command timed out'))
+        }, 45000)
+
+        child.stdout?.on('data', chunk => {
+          stdout += chunk.toString()
+        })
+        child.stderr?.on('data', chunk => {
+          stderr += chunk.toString()
+        })
+        child.once('error', err => {
+          clearTimeout(timer)
+          reject(err)
+        })
+        child.once('exit', code => {
+          clearTimeout(timer)
+          resolve({ code: code ?? 1, stdout, stderr })
+        })
+      })
+  }
 }
 
 // Windows console-window flashes are governed by the *parent's* console, not by
@@ -9910,6 +9971,11 @@ ipcMain.handle('artemis:backend:touch', async (_event, profile) => {
 ipcMain.handle('artemis:gateway:ws-url', async (_event, profile) => {
   return gatewayWsUrlIpcResult(() => freshGatewayWsUrl(profile))
 })
+ipcMain.handle('artemis:listen-gateway:status', async () => getListenGatewayStatus(createListenGatewayIo()))
+ipcMain.handle('artemis:listen-gateway:start', async (_event, payload) =>
+  startListenGateway(createListenGatewayIo(), payload)
+)
+ipcMain.handle('artemis:listen-gateway:stop', async () => stopListenGateway(createListenGatewayIo()))
 ipcMain.handle('artemis:window:openSession', async (_event, sessionId, opts) => {
   if (typeof sessionId !== 'string' || !sessionId.trim()) {
     return { ok: false, error: 'invalid-session-id' }

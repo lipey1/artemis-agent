@@ -123,6 +123,40 @@ def _kill_desktop() -> None:
     )
 
 
+ARTEMIS_CMD_SHIM = (
+    "@echo off\r\n"
+    "set \"PYTHONPATH=%~dp0..\\..;%PYTHONPATH%\"\r\n"
+    "\"%~dp0python.exe\" -m artemis_cli.main %*\r\n"
+)
+
+
+def write_artemis_cmd_shim(venv_python: Path) -> Path:
+    """Rewrite leftover setuptools ``artemis.cmd`` so it invokes ``artemis_cli``."""
+    dest = Path(venv_python).parent / "artemis.cmd"
+    dest.write_text(ARTEMIS_CMD_SHIM, encoding="ascii")
+    return dest
+
+
+def refresh_cli_entrypoints(root: Path) -> None:
+    """Reinstall the editable engine so ``artemis.exe`` imports ``artemis_cli``."""
+    is_win = sys.platform.startswith("win")
+    python = root / "venv" / ("Scripts" if is_win else "bin") / ("python.exe" if is_win else "python")
+    if not python.exists():
+        return
+    _progress("Refreshing Artemis CLI")
+    env = os.environ.copy()
+    existing = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = str(root) if not existing else f"{root}{os.pathsep}{existing}"
+    subprocess.run(
+        [str(python), "-m", "pip", "install", "-e", str(root), "-q"],
+        cwd=str(root),
+        env=env,
+        check=False,
+    )
+    if is_win:
+        write_artemis_cmd_shim(python)
+
+
 def _overlay_engine_from_zip(zip_path: Path, dest: Path) -> None:
     dest.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="artemis-src-") as raw:
@@ -237,6 +271,7 @@ def apply_github_release_update(*, force: bool = False) -> int:
                 _download(zip_url, src_zip, f"source {tag}")
                 _overlay_engine_from_zip(src_zip, root)
                 print(f"  OK Engine refreshed at {root}")
+                refresh_cli_entrypoints(root)
             except (urllib.error.URLError, OSError, zipfile.BadZipFile) as exc:
                 print(f"! Engine source download failed: {exc}")
         else:

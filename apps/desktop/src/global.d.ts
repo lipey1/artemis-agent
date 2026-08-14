@@ -337,6 +337,15 @@ declare global {
       findInPage: (query: string, options?: { forward?: boolean; findNext?: boolean }) => Promise<{ count: number }>
       stopFindInPage: () => Promise<void>
       onFoundInPage: (callback: (result: { activeMatchOrdinal: number; count: number }) => void) => () => void
+      listenGateway?: {
+        status: () => Promise<{ host: string; port: number; running: boolean; token: string }>
+        start: (settings: {
+          host: string
+          port: number
+          token: string
+        }) => Promise<{ host: string; port: number; running: boolean; token: string }>
+        stop: () => Promise<{ host: string; port: number; running: boolean; token: string }>
+      }
     }
   }
 }

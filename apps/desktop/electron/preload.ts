@@ -384,5 +384,10 @@ contextBridge.exposeInMainWorld('artemisDesktop', {
     ipcRenderer.on('artemis:found-in-page', listener)
 
     return () => ipcRenderer.removeListener('artemis:found-in-page', listener)
+  },
+  listenGateway: {
+    status: () => ipcRenderer.invoke('artemis:listen-gateway:status'),
+    start: settings => ipcRenderer.invoke('artemis:listen-gateway:start', settings),
+    stop: () => ipcRenderer.invoke('artemis:listen-gateway:stop')
   }
 })

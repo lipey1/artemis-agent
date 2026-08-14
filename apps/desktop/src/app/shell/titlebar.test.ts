@@ -24,8 +24,8 @@ describe('titlebar sizing', () => {
   })
 
   it('reserves width from abutting hit targets only', () => {
-    expect(TITLEBAR_RIGHT_CLUSTER_COUNT).toBe(4)
-    expect(titlebarToolsWidthCss(TITLEBAR_RIGHT_CLUSTER_COUNT)).toBe('calc(4 * var(--titlebar-control-size))')
+    expect(TITLEBAR_RIGHT_CLUSTER_COUNT).toBe(5)
+    expect(titlebarToolsWidthCss(TITLEBAR_RIGHT_CLUSTER_COUNT)).toBe('calc(5 * var(--titlebar-control-size))')
   })
 })
 

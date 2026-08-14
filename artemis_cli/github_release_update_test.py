@@ -1,6 +1,12 @@
+import tempfile
 import unittest
+from pathlib import Path
 
-from artemis_cli.github_release_update import parse_version, pick_release_asset
+from artemis_cli.github_release_update import (
+    parse_version,
+    pick_release_asset,
+    write_artemis_cmd_shim,
+)
 
 
 class GithubReleaseUpdateTests(unittest.TestCase):
@@ -36,6 +42,18 @@ class GithubReleaseUpdateTests(unittest.TestCase):
         ]
         picked = pick_release_asset(assets, platform="linux")
         self.assertEqual(picked["name"], "Artemis-0.17.38-linux-amd64.deb")
+
+    def test_write_artemis_cmd_shim_invokes_artemis_cli(self):
+        with tempfile.TemporaryDirectory() as raw:
+            scripts = Path(raw) / "Scripts"
+            scripts.mkdir()
+            python = scripts / "python.exe"
+            python.write_text("", encoding="utf-8")
+            dest = write_artemis_cmd_shim(python)
+            body = dest.read_text(encoding="ascii")
+            self.assertEqual(dest, scripts / "artemis.cmd")
+            self.assertIn("-m artemis_cli.main", body)
+            self.assertNotIn("hermes_cli", body)
 
 
 if __name__ == "__main__":

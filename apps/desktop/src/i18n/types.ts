@@ -248,6 +248,22 @@ export interface Translations {
     exitHud: string
     layoutEditor: string
     layoutEditorTitle: string
+    gatewayListen: string
+    gatewayListenTitle: string
+    gatewayListenDesc: string
+    gatewayListenHost: string
+    gatewayListenPort: string
+    gatewayListenKey: string
+    gatewayListenKeyHint: string
+    gatewayListenStart: string
+    gatewayListenStarting: string
+    gatewayListenStopTitle: string
+    gatewayListenStopBody: string
+    gatewayListenStop: string
+    gatewayListenStopping: string
+    gatewayListenStopped: string
+    gatewayListenFailed: string
+    gatewayListenUnavailable: string
   }
 
   keybinds: {

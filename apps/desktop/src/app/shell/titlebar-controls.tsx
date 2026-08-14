@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Tip, TipKeybindLabel } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
+import { Wifi, WifiOff } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { $hapticsMuted, toggleHapticsMuted } from '@/store/haptics'
 import {
@@ -20,6 +21,7 @@ import {
 
 import { appViewForPath, isOverlayView } from '../routes'
 
+import { GatewayListenDialogs, listenGatewayDialogKind } from './gateway-listen-dialog'
 import {
   TITLEBAR_ICON_BADGE_SCALE,
   titlebarButtonClass,
@@ -107,6 +109,18 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
   const hapticsMuted = useStore($hapticsMuted)
   const fileBrowserOpen = useStore($fileBrowserOpen)
   const sidebarOpen = useStore($sidebarOpen)
+  const [listenGatewayRunning, setListenGatewayRunning] = useState(false)
+  const [listenConfigureOpen, setListenConfigureOpen] = useState(false)
+  const [listenStopOpen, setListenStopOpen] = useState(false)
+
+  useEffect(() => {
+    const api = window.artemisDesktop?.listenGateway
+    if (!api) {
+      return
+    }
+
+    void api.status().then(status => setListenGatewayRunning(status.running)).catch(() => {})
+  }, [])
 
   const toggleHaptics = () => {
     if (!hapticsMuted) {
@@ -165,6 +179,37 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
 
   // Static system tools — always pinned to the screen's right edge.
   const systemTools: TitlebarTool[] = [
+    {
+      active: listenGatewayRunning,
+      icon: listenGatewayRunning ? (
+        <Wifi className="size-[0.87rem]" size={14} stroke={1.75} />
+      ) : (
+        <WifiOff className="size-[0.87rem]" size={14} stroke={1.75} />
+      ),
+      id: 'listen-gateway',
+      label: t.titlebar.gatewayListen,
+      onSelect: () => {
+        triggerHaptic('open')
+        const api = window.artemisDesktop?.listenGateway
+        if (!api) {
+          setListenConfigureOpen(true)
+
+          return
+        }
+
+        void api
+          .status()
+          .then(status => {
+            setListenGatewayRunning(status.running)
+            if (listenGatewayDialogKind(status.running) === 'stop') {
+              setListenStopOpen(true)
+            } else {
+              setListenConfigureOpen(true)
+            }
+          })
+          .catch(() => setListenConfigureOpen(true))
+      }
+    },
     {
       className: 'group/tool',
       // Hover + held ⌘/Ctrl morphs the glyph into its reset form (see
@@ -262,6 +307,14 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
         ))}
         <TitlebarToolButton navigate={navigate} tool={rightSidebarTool} />
       </div>
+
+      <GatewayListenDialogs
+        configureOpen={listenConfigureOpen}
+        onConfigureOpenChange={setListenConfigureOpen}
+        onRunningChange={setListenGatewayRunning}
+        onStopOpenChange={setListenStopOpen}
+        stopOpen={listenStopOpen}
+      />
     </>
   )
 }

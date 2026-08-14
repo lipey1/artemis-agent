@@ -205,7 +205,23 @@ export const en: Translations = {
     enterHud: 'HUD mode',
     exitHud: 'Exit HUD mode',
     layoutEditor: 'Layout editor',
-    layoutEditorTitle: 'Layout editor — ⌘-click resets the layout'
+    layoutEditorTitle: 'Layout editor — ⌘-click resets the layout',
+    gatewayListen: 'Gateway',
+    gatewayListenTitle: 'Gateway',
+    gatewayListenDesc: 'Host, port, and key for devices that connect to this machine.',
+    gatewayListenHost: 'Host',
+    gatewayListenPort: 'Port',
+    gatewayListenKey: 'Key',
+    gatewayListenKeyHint: 'Leave blank to generate',
+    gatewayListenStart: 'Start',
+    gatewayListenStarting: 'Starting…',
+    gatewayListenStopTitle: 'Stop gateway?',
+    gatewayListenStopBody: 'The gateway is running. Stop it?',
+    gatewayListenStop: 'Stop',
+    gatewayListenStopping: 'Stopping…',
+    gatewayListenStopped: 'Stopped',
+    gatewayListenFailed: 'Could not start the gateway.',
+    gatewayListenUnavailable: 'Gateway control is only available in the desktop app.'
   },
 
   keybinds: {

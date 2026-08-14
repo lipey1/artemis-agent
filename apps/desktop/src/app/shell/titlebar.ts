@@ -77,7 +77,7 @@ export const titlebarToolClusterClass =
 /** Buttons in the right titlebar cluster: layout, haptics, settings, and the
  *  right-sidebar toggle. Must match TitlebarControls. The titlebar drag strip
  *  reserves this width so it does not cover the leftmost icon. */
-export const TITLEBAR_RIGHT_CLUSTER_COUNT = 4
+export const TITLEBAR_RIGHT_CLUSTER_COUNT = 5
 
 /** Width reserved for N abutting titlebar tool buttons. */
 export function titlebarToolsWidthCss(toolCount: number): string {
