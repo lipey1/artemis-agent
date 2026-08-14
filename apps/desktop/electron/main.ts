@@ -49,6 +49,7 @@ import { shouldLatchBackendStartFailure, shouldLatchRemoteReauthFailure } from '
 import { detectRemoteDisplay, isWindowsBinaryPathInWsl, isWslEnvironment } from './bootstrap-platform'
 import { decideBootstrapRepair } from './bootstrap-repair-guard'
 import { runBootstrap } from './bootstrap-runner'
+import { hasStaleHermesHalfRename } from './stale-hermes-runtime'
 import { applyConnectionChange, resolveTerminalConnection } from './connection-apply'
 import {
   authModeFromStatus,
@@ -3744,6 +3745,12 @@ function readBootstrapMarker() {
 // "already installed" off the filesystem alone, not just the marker.
 function isActiveRuntimeUsable() {
   const venvPython = getVenvPython(VENV_ROOT)
+
+  // Half-renamed Hermes→Artemis trees look installed but ImportError at runtime.
+  // Treat them as unusable so first-run / repair bootstrap replaces the source.
+  if (hasStaleHermesHalfRename(ACTIVE_ARTEMIS_ROOT)) {
+    return false
+  }
 
   return (
     isArtemisSourceRoot(ACTIVE_ARTEMIS_ROOT) &&

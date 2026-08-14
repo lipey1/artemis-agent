@@ -17,7 +17,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-_VERSION_FALLBACK = "0.17.34"
+_VERSION_FALLBACK = "0.17.35"
 _DATE_FALLBACK = "2026.8.13"
 _PRODUCT_NAME = "artemis-agent"
 

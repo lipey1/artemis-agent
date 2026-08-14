@@ -120,7 +120,16 @@ function execProbeSync(
  * @returns {string}
  */
 function artemisRuntimeImportProbe() {
-  return 'import yaml; import dotenv; import artemis_cli.config'
+  // Also exercise symbols that half-renamed Hermes→Artemis trees break on:
+  // cli/model_switch and tools.environments.* ImportErrors (#Hermes leftovers).
+  return [
+    'import yaml',
+    'import dotenv',
+    'import artemis_cli.config',
+    'from artemis_cli.model_switch import is_nous_artemis_non_agentic',
+    'from tools.environments.local import _ARTEMIS_PROVIDER_ENV_BLOCKLIST',
+    'from tools.environments.docker import _ARTEMIS_PROVIDER_ENV_BLOCKLIST'
+  ].join('; ')
 }
 
 /**
