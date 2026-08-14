@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest import mock
 
 from artemis_cli.github_release_update import (
+    _run_windows_installer,
     _windows_detached_flags,
     parse_version,
     pick_release_asset,
@@ -115,6 +116,27 @@ class GithubReleaseUpdateTests(unittest.TestCase):
             self.assertEqual(_windows_detached_flags(), 0x00000008 | 0x00000200)
         with mock.patch("artemis_cli.github_release_update.sys.platform", "linux"):
             self.assertEqual(_windows_detached_flags(), 0)
+
+    def test_windows_installer_kills_nsis_autostart(self):
+        installer = Path("C:/tmp/Artemis-0.17.54-win-x64.exe")
+        kills: list[str] = []
+
+        def fake_run(cmd, **kwargs):
+            argv = [str(part) for part in cmd]
+            if argv[:3] == ["taskkill", "/IM", "Artemis.exe"]:
+                kills.append("taskkill")
+                return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+            return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+        with (
+            mock.patch("artemis_cli.github_release_update.subprocess.run", side_effect=fake_run),
+            mock.patch("artemis_cli.github_release_update.time.sleep"),
+            mock.patch("artemis_cli.github_release_update.sys.platform", "win32"),
+        ):
+            code = _run_windows_installer(installer)
+
+        self.assertEqual(code, 0)
+        self.assertGreaterEqual(len(kills), 2)
 
 
 if __name__ == "__main__":

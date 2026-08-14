@@ -109,34 +109,56 @@ if ($code -eq 0) {
 
 Start-Sleep -Seconds 1
 
+function Stop-ArtemisGui {
+  Get-Process -Name "Artemis" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+  $deadline = (Get-Date).AddSeconds(15)
+  while ((Get-Date) -lt $deadline) {
+    $alive = @(Get-Process -Name "Artemis" -ErrorAction SilentlyContinue)
+    if ($alive.Count -eq 0) {
+      return
+    }
+    $alive | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 300
+  }
+}
+
 function Start-DetachedGui([string]$Exe) {
-  # `cmd start` creates a process that is NOT attached to this console.
-  # `Start-Process` from a visible PowerShell lets Electron AttachConsole,
-  # so this window stays open and closing it kills Artemis.
+  # WScript.Shell.Run wait=false starts a GUI and returns immediately, with
+  # no console attach. `Start-Process` lets Electron AttachConsole (this
+  # window stays open; closing it kills Artemis). `cmd start` quoting has
+  # also blocked this script, so the marker was never cleared.
   $dir = Split-Path -Parent $Exe
-  $exeArg = [string]$Exe
-  $dirArg = [string]$dir
-  cmd.exe /d /s /c "start `"`" /D `"$dirArg`" `"$exeArg`"" | Out-Null
+  try {
+    $shell = New-Object -ComObject WScript.Shell
+    $shell.CurrentDirectory = [string]$dir
+    [void]$shell.Run(('"{0}"' -f $Exe), 1, $false)
+  } catch {
+    cmd.exe /d /c "start `"`" `"$Exe`"" | Out-Null
+  }
+}
+
+function Clear-UpdateMarker {
+  try {
+    if (Test-Path $marker) {
+      $owner = (Get-Content -Path $marker -TotalCount 1 | Out-String).Trim()
+      if ($owner -eq [string]$PID) {
+        Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue
+      }
+    }
+  } catch {}
 }
 
 if ($RelaunchExe -and (Test-Path -LiteralPath $RelaunchExe)) {
-  # NSIS runAfterFinish may already have started a console-attached copy.
-  Get-Process -Name "Artemis" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-  Start-Sleep -Milliseconds 600
+  # NSIS runAfterFinish may already have started a copy that is parked on
+  # the update marker. Kill it and wait until it is actually gone.
+  Stop-ArtemisGui
+  Start-Sleep -Seconds 1
+  Clear-UpdateMarker
   Write-UpdateStatus "Restarting Artemis..." "Cyan"
   Start-DetachedGui $RelaunchExe
 } else {
   Write-UpdateLog "skip relaunch (missing exe)"
+  Clear-UpdateMarker
 }
 
-try {
-  if (Test-Path $marker) {
-    $owner = (Get-Content -Path $marker -TotalCount 1 | Out-String).Trim()
-    if ($owner -eq [string]$PID) {
-      Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue
-    }
-  }
-} catch {}
-
-Start-Sleep -Seconds 1
-exit $(if ($null -eq $code) { 0 } else { $code })
+[Environment]::Exit($(if ($null -eq $code) { 0 } else { $code }))

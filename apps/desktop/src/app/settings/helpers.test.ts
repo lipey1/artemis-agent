@@ -23,10 +23,12 @@ describe('settings helpers', () => {
       expect.arrayContaining([
         'desktop.repo_scan_enabled',
         'desktop.repo_scan_roots',
-        'desktop.repo_scan_exclude_paths'
+        'desktop.repo_scan_exclude_paths',
+        'desktop.gateway_auto_start'
       ])
     )
     expect(fieldCopyForSchemaKey(FIELD_LABELS, 'desktop.repo_scan_enabled')).toBeTruthy()
+    expect(fieldCopyForSchemaKey(FIELD_LABELS, 'desktop.gateway_auto_start')).toBe('Start gateway automatically')
     expect(fieldCopyForSchemaKey(FIELD_DESCRIPTIONS, 'desktop.repo_scan_exclude_paths')).toBeTruthy()
   })
 

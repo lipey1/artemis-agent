@@ -494,6 +494,7 @@ export const ar = defineLocale({
       'approvals.timeout': 'مهلة الموافقة',
       'approvals.mcpReloadConfirm': 'تأكيد إعادة تحميل MCP',
       commandAllowlist: 'قائمة الأوامر المسموحة',
+      'desktop.gatewayAutoStart': 'تشغيل البوابة تلقائيا',
       'security.redactSecrets': 'إخفاء الأسرار',
       'security.allowPrivateUrls': 'السماح بالروابط الخاصة',
       'browser.allowPrivateUrls': 'روابط المتصفح الخاصة',

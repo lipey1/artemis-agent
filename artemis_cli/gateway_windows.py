@@ -982,6 +982,19 @@ def _install_choice_from_env(name: str) -> bool | None:
     return None
 
 
+def _skip_login_service_install() -> bool:
+    """True when start() must spawn once and leave login autostart alone.
+
+    Desktop titlebar Start sets ``ARTEMIS_GATEWAY_SKIP_SERVICE=1``. Older
+    Desktop builds only set ``ARTEMIS_GATEWAY_DETACHED=1``; that must also
+    skip install, or one WiFi click silently creates a login Scheduled Task.
+    Persistence stays on ``artemis gateway install``.
+    """
+    if _install_choice_from_env("ARTEMIS_GATEWAY_SKIP_SERVICE") is True:
+        return True
+    return _install_choice_from_env("ARTEMIS_GATEWAY_DETACHED") is True
+
+
 def _prompt_install_choices(
     start_now: bool | None = None,
     start_on_login: bool | None = None,
@@ -1479,13 +1492,25 @@ def start() -> None:
         print(f"✓ Gateway already running (PID: {', '.join(map(str, running_pids))})")
         return
 
+    # Session-scoped callers (Desktop WiFi button) must not install login
+    # autostart. A non-TTY `gateway start` used to default the install prompt
+    # to Yes and silently create a Scheduled Task / Startup entry.
+    if _skip_login_service_install():
+        pid = _spawn_detached()
+        _report_gateway_start(f"direct spawn (PID {pid})")
+        return
+
     task_installed = is_task_registered()
     startup_installed = is_startup_entry_installed()
 
     if not task_installed and not startup_installed:
-        from artemis_cli.setup import prompt_yes_no
+        from artemis_cli.setup import is_noninteractive, prompt_yes_no
 
         print("✗ Gateway service is not installed")
+        if is_noninteractive():
+            pid = _spawn_detached()
+            _report_gateway_start(f"direct spawn (PID {pid})")
+            return
         if not prompt_yes_no("  Install it now so the gateway starts on login?", True):
             print("  Run: artemis gateway install")
             return

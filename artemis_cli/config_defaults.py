@@ -3215,6 +3215,9 @@ DEFAULT_CONFIG = {
         # microphone) survive every update. Empty keeps the default stable
         # ad-hoc signing (identifier-pinned requirement).
         "macos_signing_identity": "",
+        # Start the messaging gateway (`artemis gateway run`) when Desktop opens.
+        # Off by default: the titlebar Wi-Fi button starts it for this session only.
+        "gateway_auto_start": False,
         # Auto-continue a turn that was killed mid-run by an app/backend/machine
         # crash: resuming that session re-submits the interrupted prompt (shown
         # as a "resumed interrupted turn" event) if the interruption is fresh.

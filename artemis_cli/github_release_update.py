@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.request
 import zipfile
@@ -277,6 +278,14 @@ def _run_windows_installer(installer: Path) -> int:
         stderr=subprocess.DEVNULL,
         creationflags=_windows_detached_flags(),
     )
+    # NSIS runAfterFinish launches Artemis.exe before this process returns.
+    # That copy boots while desktop-update.ps1 still owns
+    # .artemis-update-in-progress, so the GUI parks on "Starting Artemis..."
+    # and the update console never exits. Kill it here; the hand-off script
+    # starts a detached copy after it clears the marker.
+    _kill_desktop()
+    time.sleep(1.5)
+    _kill_desktop()
     return int(completed.returncode or 0)
 
 

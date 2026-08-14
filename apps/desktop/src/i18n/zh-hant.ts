@@ -396,7 +396,8 @@ export const zhHant = defineLocale({
       desktop: {
         repoScanEnabled: '自動探索程式碼儲存庫',
         repoScanRoots: '程式碼儲存庫掃描根目錄',
-        repoScanExcludePaths: '排除的程式碼儲存庫路徑'
+        repoScanExcludePaths: '排除的程式碼儲存庫路徑',
+        gatewayAutoStart: '自動啟動閘道'
       },
       agent: {
         maxTurns: '最大代理步數',
@@ -556,7 +557,8 @@ export const zhHant = defineLocale({
       desktop: {
         repoScanEnabled: '掃描本機資料夾，並在「專案」中顯示 Git 程式碼儲存庫。',
         repoScanRoots: '要掃描的資料夾。留空時掃描主目錄。',
-        repoScanExcludePaths: '探索程式碼儲存庫時略過這些資料夾及其子目錄。'
+        repoScanExcludePaths: '探索程式碼儲存庫時略過這些資料夾及其子目錄。',
+        gatewayAutoStart: '開啟 Artemis 時啟動訊息閘道。關閉應用後仍保持執行。標題列的 Wi-Fi 按鈕仍可在此工作階段啟動或停止。'
       },
       timezone: 'Artemis 需要本機時間上下文時使用。留空則使用系統時區。',
       agent: {

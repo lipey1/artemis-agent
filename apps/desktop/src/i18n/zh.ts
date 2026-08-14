@@ -534,7 +534,8 @@ export const zh: Translations = {
       desktop: {
         repoScanEnabled: '自动发现代码仓库',
         repoScanRoots: '代码仓库扫描根目录',
-        repoScanExcludePaths: '排除的代码仓库路径'
+        repoScanExcludePaths: '排除的代码仓库路径',
+        gatewayAutoStart: '自动启动网关'
       },
       agent: {
         maxTurns: '最大智能体步数',
@@ -694,7 +695,8 @@ export const zh: Translations = {
       desktop: {
         repoScanEnabled: '扫描本地文件夹，并在“项目”中显示 Git 代码仓库。',
         repoScanRoots: '要扫描的文件夹。留空时扫描主目录。',
-        repoScanExcludePaths: '发现代码仓库时跳过这些文件夹及其子目录。'
+        repoScanExcludePaths: '发现代码仓库时跳过这些文件夹及其子目录。',
+        gatewayAutoStart: '打开 Artemis 时启动消息网关。关闭应用后仍保持运行。标题栏 Wi-Fi 按钮仍可在本会话中启动或停止。'
       },
       timezone: '当 Artemis 需要本地时间上下文时使用。留空则使用系统时区。',
       agent: {

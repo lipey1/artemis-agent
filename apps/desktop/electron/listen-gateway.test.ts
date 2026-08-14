@@ -3,12 +3,14 @@ import assert from 'node:assert/strict'
 import { test } from 'vitest'
 
 import {
+  applyListenGatewayAutoStart,
   defaultListenGatewaySettings,
   fetchListenGatewayStatus,
   getListenGatewaySnapshot,
   listenGatewayCliEnv,
   listenGatewayPidPath,
   listenGatewaySettingsPath,
+  maybeAutoStartListenGateway,
   normalizeListenGatewaySettings,
   parseGatewayPidFile,
   parseGatewayStatusOutput,
@@ -42,6 +44,8 @@ test('normalizeListenGatewaySettings: fills defaults and clamps port', () => {
   assert.equal(normalizeListenGatewaySettings({ host: ' 10.0.0.8 ', port: 18789, token: 'k' }).host, '10.0.0.8')
   assert.equal(normalizeListenGatewaySettings({ port: 0 }).port, 8642)
   assert.equal(normalizeListenGatewaySettings({ port: 70000 }).port, 8642)
+  assert.equal(normalizeListenGatewaySettings({ autoStart: true }).autoStart, true)
+  assert.equal(normalizeListenGatewaySettings({ autoStart: 'yes' }).autoStart, false)
 })
 
 test('parseGatewayStatusOutput: running vs stopped', () => {
@@ -144,4 +148,46 @@ test('listenGatewayCliEnv: exports API_SERVER listen fields', () => {
   assert.equal(env.API_SERVER_PORT, '18789')
   assert.equal(env.API_SERVER_KEY, 'k')
   assert.equal(env.API_SERVER_ENABLED, 'true')
+  assert.equal(env.ARTEMIS_GATEWAY_SKIP_SERVICE, '1')
+  assert.equal(env.ARTEMIS_NONINTERACTIVE, '1')
+})
+
+test('startListenGateway: keeps autoStart from saved settings', async () => {
+  const files: Record<string, string> = {
+    [listenGatewaySettingsPath('/home/artemis')]: JSON.stringify({
+      host: '0.0.0.0',
+      port: 8642,
+      token: 'k',
+      autoStart: true
+    })
+  }
+  const io = makeIo({
+    files,
+    runCli: async () => ({ code: 0, stdout: 'started\n', stderr: '' })
+  })
+  const status = await startListenGateway(io, { host: '0.0.0.0', port: 8642, token: 'k' })
+
+  assert.equal(status.autoStart, true)
+  assert.match(files[listenGatewaySettingsPath('/home/artemis')] ?? '', /"autoStart": true/)
+})
+
+test('maybeAutoStartListenGateway: no-ops unless autoStart is saved', async () => {
+  const calls: string[][] = []
+  const io = makeIo({
+    runCli: async args => {
+      calls.push(args)
+
+      return { code: 0, stdout: '', stderr: '' }
+    }
+  })
+
+  const skipped = await maybeAutoStartListenGateway(io)
+  assert.equal(skipped.running, false)
+  assert.equal(skipped.autoStart, false)
+  assert.equal(calls.length, 0)
+
+  const started = await applyListenGatewayAutoStart(io, true)
+  assert.equal(started.autoStart, true)
+  assert.equal(started.running, true)
+  assert.equal(calls[0]?.join(' '), '-m artemis_cli.main gateway start')
 })

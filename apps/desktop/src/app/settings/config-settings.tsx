@@ -165,6 +165,13 @@ export function ConfigSettings({
               await scanAndRecordRepos(true)
             }
 
+            const autoStart = Boolean(getNested(config, 'desktop.gateway_auto_start'))
+            try {
+              await window.artemisDesktop?.listenGateway?.setAutoStart(autoStart)
+            } catch (err) {
+              notifyError(err, c.autosaveFailed)
+            }
+
             onConfigSaved?.()
           }
         } catch (err) {

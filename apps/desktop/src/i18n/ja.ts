@@ -408,7 +408,8 @@ export const ja = defineLocale({
       desktop: {
         repoScanEnabled: 'リポジトリの自動検出',
         repoScanRoots: 'リポジトリの検索ルート',
-        repoScanExcludePaths: '除外するリポジトリパス'
+        repoScanExcludePaths: '除外するリポジトリパス',
+        gatewayAutoStart: 'ゲートウェイを自動起動'
       },
       agent: {
         maxTurns: '最大エージェントステップ',
@@ -568,7 +569,9 @@ export const ja = defineLocale({
       desktop: {
         repoScanEnabled: 'ローカルフォルダを検索して Git リポジトリをプロジェクトに表示します。',
         repoScanRoots: '検索するフォルダです。空の場合はホームディレクトリを検索します。',
-        repoScanExcludePaths: 'リポジトリ検出時に除外するフォルダとその配下です。'
+        repoScanExcludePaths: 'リポジトリ検出時に除外するフォルダとその配下です。',
+        gatewayAutoStart:
+          'Artemis 起動時にメッセージングゲートウェイを開始します。アプリを閉じても動き続けます。タイトルバーの Wi-Fi ボタンでもこのセッションの開始と停止ができます。'
       },
       timezone:
         'Artemis がローカル時刻のコンテキストを必要とするときに使用します。空欄ならシステムのタイムゾーンを使います。',

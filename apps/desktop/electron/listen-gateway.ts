@@ -20,6 +20,7 @@ export type ListenGatewaySettings = {
   host: string
   port: number
   token: string
+  autoStart: boolean
 }
 
 export type ListenGatewayStatus = ListenGatewaySettings & {
@@ -53,7 +54,8 @@ export function defaultListenGatewaySettings(): ListenGatewaySettings {
   return {
     host: DEFAULT_LISTEN_GATEWAY_HOST,
     port: DEFAULT_LISTEN_GATEWAY_PORT,
-    token: ''
+    token: '',
+    autoStart: false
   }
 }
 
@@ -68,8 +70,9 @@ export function normalizeListenGatewaySettings(raw: unknown): ListenGatewaySetti
   const parsedPort = typeof value.port === 'number' ? value.port : Number.parseInt(String(value.port ?? ''), 10)
   const port = Number.isInteger(parsedPort) && parsedPort >= 1 && parsedPort <= 65535 ? parsedPort : defaults.port
   const token = typeof value.token === 'string' ? value.token : ''
+  const autoStart = value.autoStart === true
 
-  return { host, port, token }
+  return { host, port, token, autoStart }
 }
 
 export function parseGatewayStatusOutput(stdout: string, stderr = ''): boolean {
@@ -163,7 +166,9 @@ export function listenGatewayCliEnv(io: ListenGatewayIo, settings: ListenGateway
     API_SERVER_HOST: settings.host,
     API_SERVER_PORT: String(settings.port),
     API_SERVER_KEY: settings.token,
-    ARTEMIS_GATEWAY_DETACHED: '1'
+    ARTEMIS_GATEWAY_DETACHED: '1',
+    ARTEMIS_GATEWAY_SKIP_SERVICE: '1',
+    ARTEMIS_NONINTERACTIVE: '1'
   }
 }
 
@@ -210,11 +215,40 @@ export async function fetchListenGatewayStatus(io: ListenGatewayIo): Promise<Lis
   return { ...settings, running: parseGatewayStatusOutput(result.stdout, result.stderr) }
 }
 
+export function setListenGatewayAutoStart(io: ListenGatewayIo, autoStart: boolean): ListenGatewaySettings {
+  return saveListenGatewaySettings(io, { ...loadListenGatewaySettings(io), autoStart })
+}
+
+export async function applyListenGatewayAutoStart(
+  io: ListenGatewayIo,
+  autoStart: boolean
+): Promise<ListenGatewayStatus> {
+  const settings = setListenGatewayAutoStart(io, autoStart)
+  if (!autoStart) {
+    return { ...settings, running: probeListenGatewayRunning(io) }
+  }
+
+  if (probeListenGatewayRunning(io)) {
+    return { ...settings, running: true }
+  }
+
+  return startListenGateway(io, settings)
+}
+
+export async function maybeAutoStartListenGateway(io: ListenGatewayIo): Promise<ListenGatewayStatus> {
+  const settings = loadListenGatewaySettings(io)
+  if (!settings.autoStart) {
+    return { ...settings, running: probeListenGatewayRunning(io) }
+  }
+
+  return applyListenGatewayAutoStart(io, true)
+}
+
 export async function startListenGateway(
   io: ListenGatewayIo,
-  input: ListenGatewaySettings
+  input: Partial<ListenGatewaySettings>
 ): Promise<ListenGatewayStatus> {
-  let settings = normalizeListenGatewaySettings(input)
+  let settings = normalizeListenGatewaySettings({ ...loadListenGatewaySettings(io), ...input })
   if (!settings.token.trim()) {
     settings = { ...settings, token: (io.randomToken ?? generateListenGatewayToken)() }
   }

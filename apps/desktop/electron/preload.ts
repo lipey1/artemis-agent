@@ -389,6 +389,7 @@ contextBridge.exposeInMainWorld('artemisDesktop', {
     snapshot: () => ipcRenderer.invoke('artemis:listen-gateway:snapshot'),
     status: () => ipcRenderer.invoke('artemis:listen-gateway:status'),
     start: settings => ipcRenderer.invoke('artemis:listen-gateway:start', settings),
-    stop: () => ipcRenderer.invoke('artemis:listen-gateway:stop')
+    stop: () => ipcRenderer.invoke('artemis:listen-gateway:stop'),
+    setAutoStart: enabled => ipcRenderer.invoke('artemis:listen-gateway:set-auto-start', enabled)
   }
 })

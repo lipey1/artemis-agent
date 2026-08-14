@@ -228,8 +228,12 @@ import { loadWindowUrlWithRetry, reloadWindowContents } from './load-window-url'
 import { installWindowRendererLifecycle } from './window-renderer-lifecycle'
 import { createWindowRevealController } from './window-reveal'
 import {
+  applyListenGatewayAutoStart,
   getListenGatewaySnapshot,
   fetchListenGatewayStatus,
+  listenGatewayCliEnv,
+  loadListenGatewaySettings,
+  maybeAutoStartListenGateway,
   startListenGateway,
   stopListenGateway
 } from './listen-gateway'
@@ -2294,6 +2298,8 @@ function getVenvPython(venvRoot) {
   return path.join(venvRoot, IS_WINDOWS ? path.join('Scripts', 'python.exe') : path.join('bin', 'python'))
 }
 
+let listenGatewayStartedThisSession = false
+
 function createListenGatewayIo() {
   const engineRoot = resolveUpdateRoot()
   const engineVenvPython = getVenvPython(path.join(engineRoot, 'venv'))
@@ -2348,6 +2354,55 @@ function createListenGatewayIo() {
         })
       })
   }
+}
+
+function spawnDetachedListenGatewayStop() {
+  const io = createListenGatewayIo()
+  if (!fileExists(io.pythonPath)) {
+    return
+  }
+
+  const extraEnv = listenGatewayCliEnv(io, loadListenGatewaySettings(io))
+  const child = spawn(
+    io.pythonPath,
+    ['-u', '-m', 'artemis_cli.main', 'gateway', 'stop'],
+    hiddenWindowsChildOptions({
+      cwd: io.engineRoot,
+      detached: true,
+      stdio: 'ignore',
+      env: {
+        ...process.env,
+        ...extraEnv,
+        PYTHONPATH: [extraEnv.PYTHONPATH, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter),
+        PYTHONUTF8: process.env.PYTHONUTF8 ?? '1'
+      }
+    })
+  )
+  child.unref()
+}
+
+function stopOwnedListenGatewayOnQuit() {
+  const io = createListenGatewayIo()
+  if (loadListenGatewaySettings(io).autoStart) {
+    return
+  }
+
+  if (!listenGatewayStartedThisSession) {
+    return
+  }
+
+  listenGatewayStartedThisSession = false
+  try {
+    spawnDetachedListenGatewayStop()
+  } catch {
+    void 0
+  }
+}
+
+function scheduleListenGatewayAutoStart() {
+  void maybeAutoStartListenGateway(createListenGatewayIo()).catch(err => {
+    rememberLog(`[listen-gateway] auto-start failed: ${err instanceof Error ? err.message : String(err)}`)
+  })
 }
 
 // Windows console-window flashes are governed by the *parent's* console, not by
@@ -8352,6 +8407,7 @@ async function startArtemis() {
         running: true,
         error: null
       })
+      scheduleListenGatewayAutoStart()
 
       return {
         baseUrl: remote.baseUrl,
@@ -8560,6 +8616,7 @@ async function startArtemis() {
     // failure starts fresh from attempt 1 instead of inheriting the
     // accumulated count of the resolved episode.
     bootstrapRepairAttempt = 0
+    scheduleListenGatewayAutoStart()
 
     return {
       baseUrl,
@@ -9958,10 +10015,25 @@ ipcMain.handle('artemis:gateway:ws-url', async (_event, profile) => {
 })
 ipcMain.handle('artemis:listen-gateway:snapshot', () => getListenGatewaySnapshot(createListenGatewayIo()))
 ipcMain.handle('artemis:listen-gateway:status', async () => fetchListenGatewayStatus(createListenGatewayIo()))
-ipcMain.handle('artemis:listen-gateway:start', async (_event, payload) =>
-  startListenGateway(createListenGatewayIo(), payload)
-)
-ipcMain.handle('artemis:listen-gateway:stop', async () => stopListenGateway(createListenGatewayIo()))
+ipcMain.handle('artemis:listen-gateway:start', async (_event, payload) => {
+  const status = await startListenGateway(createListenGatewayIo(), payload)
+  listenGatewayStartedThisSession = !status.autoStart
+
+  return status
+})
+ipcMain.handle('artemis:listen-gateway:stop', async () => {
+  listenGatewayStartedThisSession = false
+
+  return stopListenGateway(createListenGatewayIo())
+})
+ipcMain.handle('artemis:listen-gateway:set-auto-start', async (_event, enabled) => {
+  const status = await applyListenGatewayAutoStart(createListenGatewayIo(), Boolean(enabled))
+  if (status.autoStart) {
+    listenGatewayStartedThisSession = false
+  }
+
+  return status
+})
 ipcMain.handle('artemis:window:openSession', async (_event, sessionId, opts) => {
   if (typeof sessionId !== 'string' || !sessionId.trim()) {
     return { ok: false, error: 'invalid-session-id' }
@@ -12614,6 +12686,7 @@ app.on('before-quit', event => {
 
   stopBackendChild(backendConnectionState.getProcess())
   stopAllPoolBackends()
+  stopOwnedListenGatewayOnQuit()
 })
 
 app.on('window-all-closed', () => {
