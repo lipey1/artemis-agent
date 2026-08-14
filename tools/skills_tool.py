@@ -1054,6 +1054,14 @@ def _plugin_skill_linked_files(skill_root: Path) -> Dict[str, List[str]] | None:
     return linked or None
 
 
+# One-release aliases: early seeds taught the model Hermes skill names.
+_SKILL_VIEW_NAME_ALIASES = {
+    "hermes-agent": "artemis-agent",
+    "hermes-agent-skill-authoring": "artemis-agent-skill-authoring",
+    "inspecting-hermes-desktop-dom": "inspecting-artemis-desktop-dom",
+}
+
+
 def skill_view(
     name: str,
     file_path: str = None,
@@ -1090,6 +1098,11 @@ def skill_view(
                 },
                 ensure_ascii=False,
             )
+
+        # Map legacy Hermes skill names to Artemis equivalents for one release.
+        alias = _SKILL_VIEW_NAME_ALIASES.get(name)
+        if alias:
+            name = alias
 
         local_category_name: str | None = None
         # ── Qualified name dispatch (plugin skills) ──────────────────

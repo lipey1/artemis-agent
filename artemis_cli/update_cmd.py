@@ -1014,10 +1014,10 @@ def _update_via_zip(args):
 
     # Sync skills
     try:
-        from tools.skills_sync import sync_skills
+        from tools.skills_sync import ensure_bundled_skills
 
         print("→ Syncing bundled skills...")
-        result = sync_skills(quiet=True)
+        result = ensure_bundled_skills(quiet=True)
         if result["copied"]:
             print(f"  + {len(result['copied'])} new: {', '.join(result['copied'])}")
         if result.get("updated"):
@@ -4659,11 +4659,11 @@ def _cmd_update_impl(args, gateway_mode: bool):
 
         # Sync bundled skills (copies new, updates changed, respects user deletions)
         try:
-            from tools.skills_sync import sync_skills
+            from tools.skills_sync import ensure_bundled_skills
 
             print()
             print("→ Syncing bundled skills...")
-            result = sync_skills(quiet=True)
+            result = ensure_bundled_skills(quiet=True)
             if result["copied"]:
                 print(f"  + {len(result['copied'])} new: {', '.join(result['copied'])}")
             if result.get("updated"):

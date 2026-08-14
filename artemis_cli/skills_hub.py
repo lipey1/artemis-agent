@@ -1356,7 +1356,7 @@ def do_opt_in(sync: bool = False,
     With ``sync``, immediately re-seed bundled skills instead of waiting for
     the next ``artemis update``.
     """
-    from tools.skills_sync import set_bundled_skills_opt_out, sync_skills
+    from tools.skills_sync import set_bundled_skills_opt_out, ensure_bundled_skills
 
     c = console or _console
 
@@ -1367,7 +1367,7 @@ def do_opt_in(sync: bool = False,
     c.print(f"[bold green]{res['message']}[/]")
 
     if sync:
-        synced = sync_skills(quiet=True)
+        synced = ensure_bundled_skills(quiet=True)
         copied = len(synced.get("copied", []))
         c.print(f"[dim]Re-seeded {copied} bundled skill(s).[/]")
         if invalidate_cache:

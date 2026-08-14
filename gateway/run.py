@@ -27692,8 +27692,8 @@ async def start_gateway(config: Optional[GatewayConfig] = None, replace: bool = 
 
     # Sync bundled skills on gateway start (fast -- skips unchanged)
     try:
-        from tools.skills_sync import sync_skills
-        sync_skills(quiet=True)
+        from tools.skills_sync import ensure_bundled_skills
+        ensure_bundled_skills(quiet=True)
     except Exception:
         pass
 

@@ -3409,11 +3409,11 @@ def _blank_slate_walkthrough(config: dict, artemis_home):
         default=False,
     )
     try:
-        from tools.skills_sync import set_bundled_skills_opt_out, sync_skills
+        from tools.skills_sync import set_bundled_skills_opt_out, ensure_bundled_skills
         if seed_skills:
             # Make sure no stale opt-out marker blocks the seed, then sync.
             set_bundled_skills_opt_out(False)
-            result = sync_skills(quiet=True)
+            result = ensure_bundled_skills(quiet=True)
             copied = len(result.get("copied", [])) if isinstance(result, dict) else 0
             print_success(f"Seeded {copied} bundled skills.")
         else:

@@ -1243,8 +1243,8 @@ def seed_profile_skills(profile_dir: Path, quiet: bool = False) -> Optional[dict
     try:
         result = subprocess.run(
             [sys.executable, "-c",
-             "import json; from tools.skills_sync import sync_skills; "
-             "r = sync_skills(quiet=True); print(json.dumps(r))"],
+             "import json; from tools.skills_sync import ensure_bundled_skills; "
+             "r = ensure_bundled_skills(quiet=True); print(json.dumps(r))"],
             env={**os.environ, "ARTEMIS_HOME": str(profile_dir)},
             cwd=str(project_root),
             capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=60,

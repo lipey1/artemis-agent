@@ -933,9 +933,9 @@ def _sync_bundled_skills_for_startup() -> bool:
     if _is_termux_startup_environment() and not _termux_bundled_skills_sync_needed():
         return False
 
-    from tools.skills_sync import sync_skills
+    from tools.skills_sync import ensure_bundled_skills
 
-    sync_skills(quiet=True)
+    ensure_bundled_skills(quiet=True)
     _mark_termux_bundled_skills_synced()
     return True
 
@@ -2476,9 +2476,9 @@ def _sync_bundled_skills_quietly() -> None:
     empty skills library.
     """
     try:
-        from tools.skills_sync import sync_skills
+        from tools.skills_sync import ensure_bundled_skills
 
-        sync_skills(quiet=True)
+        ensure_bundled_skills(quiet=True)
     except Exception:
         pass
 
