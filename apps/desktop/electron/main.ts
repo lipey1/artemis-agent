@@ -3073,7 +3073,7 @@ async function applyUpdates(opts = {}) {
       // A bare detached+hidden powershell spawn silently dies before -File
       // processing (console-subsystem init failure — see
       // wrapHandoffForDetachedConsole). Route through `cmd start` so the
-      // script gets its own minimized console and survives our exit. The
+      // script gets its own visible console and survives our exit. The
       // wrapper cmd.exe exits immediately, so child.pid is NOT the script's
       // pid — the script claims the update marker itself with its own $PID
       // as its first action, and a relaunched Desktop parks on that.

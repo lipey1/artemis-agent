@@ -1,8 +1,9 @@
 /**
  * Consume the detached update hand-off's result file (#82328 follow-up).
  *
- * scripts/desktop-update.ps1 runs hidden/detached — the user never sees its
- * console. It writes ARTEMIS_HOME/.artemis-update-result.json on every exit
+ * scripts/desktop-update.ps1 runs detached in its own console so the user
+ * can watch progress. It also writes ARTEMIS_HOME/.artemis-update-result.json
+ * on every exit
  * path; the relaunched Desktop reads it exactly once on boot and surfaces
  * failures (a silent failed update looks identical to "nothing happened",
  * which is how the 2026-08-09 'closed the app then nothing' report was

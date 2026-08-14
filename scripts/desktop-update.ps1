@@ -13,11 +13,24 @@ $logDir = Join-Path $homeDir "logs"
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 $logFile = Join-Path $logDir "desktop-update.log"
 
+try {
+  $Host.UI.RawUI.WindowTitle = "Artemis Update"
+  [Console]::Title = "Artemis Update"
+  [Console]::ForegroundColor = "White"
+  [Console]::BackgroundColor = "Black"
+} catch {}
+
 function Write-UpdateLog([string]$Message) {
   Add-Content -Path $logFile -Value ("{0} {1}" -f (Get-Date -Format "o"), $Message)
 }
 
-Write-UpdateLog ("start root={0} branch={1} desktopPid={2} relaunch={3} pid={4}" -f $InstallRoot, $Branch, $DesktopPid, $RelaunchExe, $PID)
+function Write-UpdateStatus([string]$Message, [string]$Color = "White") {
+  Write-UpdateLog $Message
+  Write-Host $Message -ForegroundColor $Color
+}
+
+Write-UpdateStatus ("Artemis Update  root={0}  branch={1}" -f $InstallRoot, $Branch) "Cyan"
+Write-UpdateStatus "Keep this window open. Artemis restarts when this finishes." "Yellow"
 
 $marker = Join-Path $homeDir ".artemis-update-in-progress"
 try {
@@ -28,11 +41,13 @@ try {
 }
 
 if ($DesktopPid -gt 0) {
+  Write-UpdateStatus "Waiting for Artemis to close..." "White"
   try {
     Wait-Process -Id $DesktopPid -Timeout 90 -ErrorAction Stop
-    Write-UpdateLog "desktop pid exited"
+    Write-UpdateStatus "Artemis closed." "Green"
   } catch {
     Write-UpdateLog "desktop wait skipped: $($_.Exception.Message)"
+    Write-Host "Desktop wait skipped: $($_.Exception.Message)" -ForegroundColor DarkYellow
   }
 }
 
@@ -44,7 +59,8 @@ if (-not $InstallRoot) {
 
 $python = Join-Path $InstallRoot "venv\Scripts\python.exe"
 if (-not (Test-Path $python)) {
-  Write-UpdateLog "missing python: $python"
+  Write-UpdateStatus "Missing python: $python" "Red"
+  Start-Sleep -Seconds 8
   exit 1
 }
 
@@ -56,22 +72,34 @@ $env:ARTEMIS_ENGINE_ROOT = $InstallRoot
 $env:ARTEMIS_HOME = $homeDir
 $env:PYTHONUTF8 = "1"
 $env:PYTHONIOENCODING = "utf-8"
+$env:PYTHONUNBUFFERED = "1"
 if ($env:PYTHONPATH) {
   $env:PYTHONPATH = "$InstallRoot;$($env:PYTHONPATH)"
 } else {
   $env:PYTHONPATH = $InstallRoot
 }
 
+Write-UpdateStatus "Installing update..." "Cyan"
 Write-UpdateLog "cwd=$(Get-Location) pythonpath=$($env:PYTHONPATH)"
-Write-UpdateLog "running $python -m artemis_cli.main update --yes --force"
-cmd.exe /d /s /c "`"$python`" -m artemis_cli.main update --yes --force" >> $logFile 2>&1
+Write-UpdateLog "running $python -u -m artemis_cli.main update --yes --force"
+Write-Host ""
+
+# Live console + log. cmd keeps the native exit code; Tee-Object shows lines
+# in this window so the user can tell the update is moving.
+cmd.exe /d /s /c "`"$python`" -u -m artemis_cli.main update --yes --force" 2>&1 | Tee-Object -FilePath $logFile -Append
 $code = $LASTEXITCODE
-Write-UpdateLog "update exit $code"
+Write-Host ""
+if ($null -eq $code) { $code = 0 }
+if ($code -eq 0) {
+  Write-UpdateStatus "Update finished." "Green"
+} else {
+  Write-UpdateStatus "Update finished with exit $code." "Red"
+}
 
 Start-Sleep -Seconds 3
 $artemisRunning = Get-Process -Name "Artemis" -ErrorAction SilentlyContinue
 if ($RelaunchExe -and (Test-Path $RelaunchExe) -and -not $artemisRunning) {
-  Write-UpdateLog "relaunch $RelaunchExe"
+  Write-UpdateStatus "Restarting Artemis..." "Cyan"
   Start-Process -FilePath $RelaunchExe
 } else {
   Write-UpdateLog "skip relaunch (running=$([bool]$artemisRunning))"
@@ -86,4 +114,5 @@ try {
   }
 } catch {}
 
+Start-Sleep -Seconds 2
 exit $(if ($null -eq $code) { 0 } else { $code })
