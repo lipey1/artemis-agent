@@ -12,7 +12,9 @@ one JSON document on stdout; diagnostics on stderr only.
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
+import time
 from typing import NoReturn
 
 # Long CLI flags whose argument value must be redacted from the cmdline.
@@ -105,10 +107,11 @@ def _is_pausable_gateway(cmdline: str) -> bool:
     stop these processes (and is always active: ``artemis-setup`` invokes
     ``artemis update --yes --gateway``) — never gets the chance to run.
 
-    Only gateway invocations are exempted. Anything else running from the
-    venv (an operator's REPL, a stray script, a ``serve`` backend that
-    survived the desktop's own teardown) has no pause machinery downstream
-    and must keep blocking the handoff.
+    Only gateway invocations are exempted from reporting. Leftover Desktop
+    ``serve`` backends are reaped (not reported) because the GUI already
+    tree-killed them: ``python.exe`` often outlives the ``artemis.exe``
+    shim unlock, and aborting on that leftover dead-ends every Update click.
+    A true foreign holder (second window, user terminal) still blocks.
 
     Delegates to ``gateway.status.looks_like_gateway_command_line`` — the
     canonical ``gateway run`` matcher (profile-selector aware, shlex
@@ -126,6 +129,42 @@ def _is_pausable_gateway(cmdline: str) -> bool:
     return looks_like_gateway_command_line(cmdline)
 
 
+def _stop_process_trees(pids: list[int]) -> None:
+    """Force-stop each PID with its child tree. Best effort; never raises."""
+    for pid in pids:
+        try:
+            subprocess.run(
+                ["taskkill", "/PID", str(int(pid)), "/T", "/F"],
+                capture_output=True,
+                timeout=15,
+                check=False,
+            )
+        except Exception:
+            pass
+
+
+def _non_gateway_holder_pids(matches: list[tuple[int, str, str]]) -> list[int]:
+    """PIDs that would be reported as blockers (everything except pausable gateways)."""
+    return [pid for pid, _name, cmdline in matches if not _is_pausable_gateway(cmdline)]
+
+
+def _serialize_blockers(
+    matches: list[tuple[int, str, str]],
+) -> list[dict[str, int | str]]:
+    return [
+        {
+            "pid": pid,
+            "name": name,
+            # Truncate for display AFTER the gateway exemption has seen the
+            # full cmdline (long managed-runtime interpreter paths would
+            # otherwise swallow the `gateway run` argv).
+            "cmdline": _redact_sensitive_cmdline(cmdline)[:120],
+        }
+        for pid, name, cmdline in matches
+        if not _is_pausable_gateway(cmdline)
+    ]
+
+
 def main() -> None:
     """Entry point.  Prints one JSON doc to stdout.  Exits 0 for valid scan."""
     try:
@@ -140,18 +179,24 @@ def main() -> None:
     except Exception as exc:
         _emit_probe_fail(f"scan aborted: {exc}")
 
-    processes = [
-        {
-            "pid": pid,
-            "name": name,
-            # Truncate for display AFTER the gateway exemption has seen the
-            # full cmdline (long managed-runtime interpreter paths would
-            # otherwise swallow the `gateway run` argv).
-            "cmdline": _redact_sensitive_cmdline(cmdline)[:120],
-        }
-        for pid, name, cmdline in matches
-        if not _is_pausable_gateway(cmdline)
-    ]
+    leftover_pids = _non_gateway_holder_pids(matches)
+    if leftover_pids:
+        # Desktop already tried to tree-kill its backend. The leftover is
+        # almost always that same python.exe still winding down (or a
+        # reconnect that slipped in before the update gate). Reap and
+        # rescan so the GUI can hand off instead of showing a giant abort.
+        print(
+            f"reaping {len(leftover_pids)} leftover venv process(es) before reporting",
+            file=sys.stderr,
+        )
+        _stop_process_trees(leftover_pids)
+        time.sleep(1.0)
+        try:
+            matches = _detect_venv_python_processes()
+        except Exception as exc:
+            _emit_probe_fail(f"rescan aborted: {exc}")
+
+    processes = _serialize_blockers(matches)
     exempted = sum(1 for _pid, _name, cmdline in matches if _is_pausable_gateway(cmdline))
     data = {
         "ok": True,

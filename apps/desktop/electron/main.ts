@@ -221,7 +221,7 @@ import {
   windowsUpdateHandoffEnv,
   wrapHandoffForDetachedConsole
 } from './updater-process'
-import { formatBlockerMessage, formatProbeFailedMessage, scanVenvBlockers } from './venv-blocker-scan'
+import { clearVenvBlockers, formatBlockerMessage, formatProbeFailedMessage } from './venv-blocker-scan'
 import { fetchMarketplaceThemes, searchMarketplaceThemes } from './vscode-marketplace'
 import { createWakeIndicatorWindowController } from './wake-indicator-window'
 import { readWindowBelow } from './window-below'
@@ -2996,17 +2996,17 @@ async function applyUpdates(opts = {}) {
       return { ok: false, error: message }
     }
 
-    // Preflight: after releasing our own backends, check for remaining
-    // Artemis processes running from this venv.  The updater normally refuses
-    // when it detects a holder, but because the updater is spawned detached
-    // with stdio:ignore, the user never sees that refusal and the update
-    // silently fails.  This preflight detects holders early and gives the
-    // user an actionable error.  Windows-only; the .pyd lock hazard is a
-    // Windows phenomenon.  ALL failures (blocked, missing python, timeout,
-    // malformed output, missing psutil) abort the handoff — never proceed
-    // to the detached updater when the venv state is unknown.
+    // Preflight: after releasing our own backends, reap leftover venv
+    // python.exe (it often outlives the artemis.exe shim unlock) and abort
+    // only on true foreign holders. The updater is spawned detached with
+    // stdio:ignore, so a silent CLI refusal is invisible. Windows-only.
+    // Probe failures still abort the handoff: never proceed when the venv
+    // state is unknown.
     if (IS_WINDOWS) {
-      const scanOutcome = await scanVenvBlockers(updateRoot)
+      const scanOutcome = await clearVenvBlockers(updateRoot, {
+        killPid: forceKillProcessTree,
+        log: msg => rememberLog(`[updates] ${msg}`)
+      })
 
       if (scanOutcome.kind === 'blocked') {
         const message = formatBlockerMessage(scanOutcome.result)
@@ -3161,7 +3161,12 @@ async function applyUpdates(opts = {}) {
 
     return { ok: true, handedOff: true, updater }
   } finally {
-    updateInFlight = false
+    // Keep the in-process gate closed through the quit dwell so a renderer
+    // reconnect cannot respawn python.exe after a successful hand-off. Abort
+    // paths never set isQuittingForHandoff, so those still clear the flag.
+    if (!isQuittingForHandoff) {
+      updateInFlight = false
+    }
   }
 }
 

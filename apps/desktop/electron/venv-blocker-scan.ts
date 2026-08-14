@@ -151,6 +151,61 @@ export async function scanVenvBlockers(
   return parseVenvBlockerScanOutput(stdout)
 }
 
+export interface ClearVenvBlockersOpts {
+  /** Tree-kill a leftover holder. Required to reap; without it, blocked stays blocked. */
+  killPid?: (pid: number) => void
+  scan?: (updateRoot: string) => Promise<ScanOutcome>
+  sleep?: (ms: number) => Promise<void>
+  /** How many reap-and-rescan rounds after the first scan. Default 2. */
+  attempts?: number
+  log?: (msg: string) => void
+}
+
+/**
+ * Scan for leftover venv python holders, tree-kill them, and rescan.
+ *
+ * The Desktop already stopped its own backend before this runs, but
+ * `python.exe` often outlives the `artemis.exe` shim unlock. Aborting on
+ * that leftover is the "Update didn't finish / PID python.exe" dead-end.
+ * Only holders that survive the reap (a second window, a user terminal)
+ * stay blocked.
+ */
+export async function clearVenvBlockers(
+  updateRoot: string,
+  opts: ClearVenvBlockersOpts = {}
+): Promise<ScanOutcome> {
+  const scan = opts.scan ?? ((root: string) => scanVenvBlockers(root))
+  const sleep = opts.sleep ?? ((ms: number) => new Promise(resolve => setTimeout(resolve, ms)))
+  const attempts = Math.max(1, opts.attempts ?? 2)
+  const killPid = opts.killPid
+
+  let outcome = await scan(updateRoot)
+
+  for (let round = 0; round < attempts; round++) {
+    if (outcome.kind !== 'blocked' || !killPid) {
+      return outcome
+    }
+
+    const pids = outcome.result.processes.map(proc => proc.pid)
+    opts.log?.(
+      `reaping ${pids.length} leftover venv process(es) before update (attempt ${round + 1}/${attempts})`
+    )
+
+    for (const pid of pids) {
+      try {
+        killPid(pid)
+      } catch {
+        // Already gone, or no permission. The next scan is the real gate.
+      }
+    }
+
+    await sleep(800)
+    outcome = await scan(updateRoot)
+  }
+
+  return outcome
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers (exported for testing)
 // ---------------------------------------------------------------------------

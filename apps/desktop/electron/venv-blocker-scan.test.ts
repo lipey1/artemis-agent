@@ -15,11 +15,13 @@ import path from 'node:path'
 import { describe, it } from 'vitest'
 
 import {
+  clearVenvBlockers,
   formatBlockerMessage,
   formatProbeFailedMessage,
   parseVenvBlockerScanOutput,
   resolveVenvPython,
-  scanVenvBlockers
+  scanVenvBlockers,
+  type ScanOutcome
 } from './venv-blocker-scan'
 
 // ---------------------------------------------------------------------------
@@ -214,5 +216,81 @@ describe('scanVenvBlockers', () => {
     assert.equal(c.cwd, '/update/root')
     assert.equal(typeof c.timeout, 'number')
     assert.ok(c.timeout > 0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// clearVenvBlockers — reap leftover holders then rescan
+// ---------------------------------------------------------------------------
+
+describe('clearVenvBlockers', () => {
+  const blocked = (pid: number): ScanOutcome => ({
+    kind: 'blocked',
+    result: { blocked: true, processes: [{ pid, name: 'python.exe', cmdline: 'serve' }] }
+  })
+  const clear: ScanOutcome = { kind: 'clear', result: { blocked: false, processes: [] } }
+  const probe: ScanOutcome = { kind: 'probe-failure', error: 'psutil missing' }
+
+  it('returns clear without killing when the first scan is already clear', async () => {
+    const killed: number[] = []
+    const o = await clearVenvBlockers('/r', {
+      scan: async () => clear,
+      killPid: pid => killed.push(pid),
+      sleep: async () => {}
+    })
+
+    assert.equal(o.kind, 'clear')
+    assert.deepEqual(killed, [])
+  })
+
+  it('reaps leftover python then returns clear on rescan', async () => {
+    let n = 0
+    const killed: number[] = []
+    const o = await clearVenvBlockers('/r', {
+      scan: async () => {
+        n += 1
+
+        return n === 1 ? blocked(21248) : clear
+      },
+      killPid: pid => killed.push(pid),
+      sleep: async () => {}
+    })
+
+    assert.equal(o.kind, 'clear')
+    assert.deepEqual(killed, [21248])
+  })
+
+  it('stays blocked when holders survive every reap', async () => {
+    const killed: number[] = []
+    const o = await clearVenvBlockers('/r', {
+      scan: async () => blocked(99),
+      killPid: pid => killed.push(pid),
+      sleep: async () => {},
+      attempts: 2
+    })
+
+    assert.equal(o.kind, 'blocked')
+    assert.deepEqual(killed, [99, 99])
+  })
+
+  it('does not kill on probe-failure', async () => {
+    const killed: number[] = []
+    const o = await clearVenvBlockers('/r', {
+      scan: async () => probe,
+      killPid: pid => killed.push(pid),
+      sleep: async () => {}
+    })
+
+    assert.equal(o.kind, 'probe-failure')
+    assert.deepEqual(killed, [])
+  })
+
+  it('does not reap when killPid is omitted', async () => {
+    const o = await clearVenvBlockers('/r', {
+      scan: async () => blocked(1),
+      sleep: async () => {}
+    })
+
+    assert.equal(o.kind, 'blocked')
   })
 })

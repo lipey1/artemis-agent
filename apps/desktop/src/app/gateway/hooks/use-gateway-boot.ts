@@ -26,6 +26,7 @@ import {
 } from '@/store/gateway'
 import { $gatewaySwitching, wipeSessionListsForGatewaySwitch } from '@/store/gateway-switch'
 import { notify, notifyError } from '@/store/notifications'
+import { $backendUpdateApply, $updateApply } from '@/store/updates'
 import { $activeGatewayProfile, normalizeProfileKey, touchActiveGatewayBackend } from '@/store/profile'
 import {
   $activeSessionId,
@@ -483,6 +484,13 @@ export function useGatewayBoot({
 
     const offExit = desktop.onBackendExit(() => {
       if ($gatewaySwitching.get()) {
+        return
+      }
+
+      // Update stops the backend on purpose before handing off. A red
+      // "Backend stopped" toast on top of "Restarting Artemis..." looks like
+      // a crash, then the leftover python scan aborts the same click.
+      if ($updateApply.get().applying || $backendUpdateApply.get().applying) {
         return
       }
 
