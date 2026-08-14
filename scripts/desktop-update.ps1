@@ -75,9 +75,9 @@ if (-not (Test-Path $python)) {
   exit 1
 }
 
-# The venv is often still an editable hermes_agent install. Without this,
-# `python -m artemis_cli.main` fails in ~100ms (ModuleNotFoundError) and the
-# GUI just relaunches the same Artemis.exe.
+# The venv is often still an editable install under a leftover package name.
+# Without this, `python -m artemis_cli.main` fails in ~100ms (ModuleNotFoundError)
+# and the GUI just relaunches the same Artemis.exe.
 Set-Location -LiteralPath $InstallRoot
 $env:ARTEMIS_ENGINE_ROOT = $InstallRoot
 $env:ARTEMIS_HOME = $homeDir

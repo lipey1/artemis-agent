@@ -120,8 +120,8 @@ function execProbeSync(
  * @returns {string}
  */
 function artemisRuntimeImportProbe() {
-  // Also exercise symbols that half-renamed Hermes→Artemis trees break on:
-  // cli/model_switch and tools.environments.* ImportErrors (#Hermes leftovers).
+  // Also exercise symbols that half-renamed pre-Artemis trees break on:
+  // cli/model_switch and tools.environments.* ImportErrors.
   // Import tui_gateway.ws so incomplete agent swaps missing the WS package fail
   // the usable-runtime probe instead of looking installed until /api/ws dies.
   return [

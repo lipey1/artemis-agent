@@ -66,27 +66,6 @@ MANIFEST_FILE = SKILLS_DIR / ".bundled_manifest"
 # avoid importing the CLI layer into this low-level sync module).
 NO_BUNDLED_SKILLS_MARKER = ".no-bundled-skills"
 
-# One-release migration: Hermes-fork skill folder names → Artemis names.
-# Live installs seeded before the Artemis skills tree shipped used these
-# Hermes directory names; sync alone would leave them stranded (and the
-# model would keep loading hermes-agent). Remove the old dirs so
-# sync_skills can seed the Artemis-branded copies from the bundled tree.
-LEGACY_HERMES_SKILL_DIRS: Dict[str, str] = {
-    "autonomous-ai-agents/hermes-agent": "autonomous-ai-agents/artemis-agent",
-    "software-development/hermes-agent-skill-authoring": (
-        "software-development/artemis-agent-skill-authoring"
-    ),
-    "software-development/inspecting-hermes-desktop-dom": (
-        "software-development/inspecting-artemis-desktop-dom"
-    ),
-}
-
-LEGACY_HERMES_MANIFEST_KEYS: Dict[str, str] = {
-    "hermes-agent": "artemis-agent",
-    "hermes-agent-skill-authoring": "artemis-agent-skill-authoring",
-    "inspecting-hermes-desktop-dom": "inspecting-artemis-desktop-dom",
-}
-
 PRODUCT_SKILL_NAME = "artemis-agent"
 
 
@@ -695,96 +674,6 @@ def _recover_renamed_skill(
     return None
 
 
-def _migrate_legacy_hermes_skills(quiet: bool = False) -> List[str]:
-    """Remove Hermes-named skill dirs left by early Artemis seeds.
-
-    Early AppData seeds used Hermes directory names. Leaving them in place
-    makes the model load ``hermes-agent`` (HERMES_HOME docs) instead of
-    ``artemis-agent``. Always drop the legacy folders so ``sync_skills`` can
-    seed the Artemis-branded bundled copies. Manifest keys are remapped so
-    update detection stays coherent.
-    """
-    migrated: List[str] = []
-    if not SKILLS_DIR.exists():
-        return migrated
-
-    for old_rel, new_rel in LEGACY_HERMES_SKILL_DIRS.items():
-        old = SKILLS_DIR / Path(*old_rel.split("/"))
-        if not old.exists() or not old.is_dir():
-            continue
-        try:
-            _rmtree_writable(old)
-            migrated.append(f"removed {old_rel} (→ {new_rel})")
-            if not quiet:
-                print(f"  × {old_rel} (legacy Hermes skill removed; will re-seed as {new_rel})")
-        except (OSError, IOError, ValueError) as e:
-            logger.warning(
-                "Could not remove legacy Hermes skill %s: %s",
-                old, e, exc_info=True,
-            )
-
-    manifest = _read_manifest()
-    manifest_changed = False
-    for old_key, new_key in LEGACY_HERMES_MANIFEST_KEYS.items():
-        if old_key not in manifest:
-            continue
-        # Drop the Hermes manifest key. Do NOT transplant its origin hash onto
-        # the Artemis name when the Artemis directory is missing: that would
-        # look like a user-deleted tombstone and block re-seed on this sync.
-        new_rel = next(
-            (dst for src, dst in LEGACY_HERMES_SKILL_DIRS.items()
-             if dst.rsplit("/", 1)[-1] == new_key or src.rsplit("/", 1)[-1] == old_key),
-            None,
-        )
-        new_dest = SKILLS_DIR / Path(*new_rel.split("/")) if new_rel else None
-        if (
-            new_key not in manifest
-            and new_dest is not None
-            and new_dest.exists()
-        ):
-            manifest[new_key] = manifest[old_key]
-            migrated.append(f"manifest {old_key} -> {new_key}")
-        else:
-            migrated.append(f"manifest dropped {old_key}")
-        del manifest[old_key]
-        manifest_changed = True
-    if manifest_changed:
-        _write_manifest(manifest)
-
-    # Curator suppression may still list Hermes names; remap so the Artemis
-    # replacement is not blocked from re-seeding, and drop the old keys.
-    suppressed_path = SKILLS_DIR / ".curator_suppressed"
-    if suppressed_path.exists():
-        try:
-            lines = suppressed_path.read_text(encoding="utf-8").splitlines()
-            out: List[str] = []
-            changed_suppressed = False
-            seen: Set[str] = set()
-            for line in lines:
-                raw = line.strip()
-                if not raw or raw.startswith("#"):
-                    out.append(line)
-                    continue
-                mapped = LEGACY_HERMES_MANIFEST_KEYS.get(raw, raw)
-                if mapped != raw:
-                    changed_suppressed = True
-                if mapped in seen:
-                    changed_suppressed = True
-                    continue
-                seen.add(mapped)
-                out.append(mapped if mapped == raw else mapped)
-            if changed_suppressed:
-                suppressed_path.write_text(
-                    "\n".join(out) + ("\n" if out else ""),
-                    encoding="utf-8",
-                )
-                migrated.append("curator_suppressed remapped")
-        except OSError:
-            pass
-
-    return migrated
-
-
 def _product_skill_present() -> bool:
     """True when the Artemis product skill exists under SKILLS_DIR."""
     if not SKILLS_DIR.exists():
@@ -806,43 +695,24 @@ def _product_skill_present() -> bool:
 def ensure_bundled_skills(quiet: bool = True) -> dict:
     """Seed/repair bundled skills for install, update, and desktop/engine start.
 
-    Runs Hermes→Artemis directory migration, then ``sync_skills``. If a
-    migrated Artemis skill (or the product skill ``artemis-agent``) is still
-    missing after sync because a remapped manifest entry looked like a
-    user-delete tombstone, clears those tombstones and retries once.
+    Runs ``sync_skills``. If the product skill ``artemis-agent`` is still
+    missing after sync because a manifest entry looked like a user-delete
+    tombstone, clears that tombstone and retries once.
     """
-    migrated = _migrate_legacy_hermes_skills(quiet=quiet)
     result = sync_skills(quiet=quiet)
-    result["migrated_legacy"] = migrated
 
     if result.get("skipped_opt_out"):
         return result
 
-    # Tombstones: remapped Hermes→Artemis manifest keys (or a prior user
-    # delete) leave the Artemis name in the manifest with no on-disk dir,
-    # which sync treats as "user deleted — do not re-add". Clear those
-    # entries so install / update / desktop start always repair them.
-    must_exist = {PRODUCT_SKILL_NAME, *LEGACY_HERMES_MANIFEST_KEYS.values()}
+    # Tombstones: a prior user delete can leave the Artemis name in the
+    # manifest with no on-disk dir, which sync treats as "user deleted, do
+    # not re-add". Clear those entries so install / update / desktop start
+    # always repair the product skill.
+    must_exist = {PRODUCT_SKILL_NAME}
     missing = []
-    for skill_name in sorted(must_exist):
-        # Prefer canonical path when known; fall back to any dir named skill_name.
-        rel = next(
-            (dst for dst in LEGACY_HERMES_SKILL_DIRS.values()
-             if dst.rsplit("/", 1)[-1] == skill_name),
-            None,
-        )
-        if rel is not None:
-            present = (SKILLS_DIR / Path(*rel.split("/")) / "SKILL.md").is_file()
-        else:
-            present = _product_skill_present() if skill_name == PRODUCT_SKILL_NAME else False
-            if not present and SKILLS_DIR.exists():
-                present = any(
-                    md.parent.name == skill_name
-                    for md in SKILLS_DIR.rglob("SKILL.md")
-                    if not is_excluded_skill_path(md)
-                )
-        if not present:
-            missing.append(skill_name)
+    present = _product_skill_present()
+    if not present:
+        missing.append(PRODUCT_SKILL_NAME)
 
     if not missing:
         return result
@@ -858,7 +728,6 @@ def ensure_bundled_skills(quiet: bool = True) -> dict:
         if not quiet:
             print(f"  ! re-seeding missing skill(s): {', '.join(missing)}")
         retry = sync_skills(quiet=quiet)
-        retry["migrated_legacy"] = migrated
         retry["repaired_product_skill"] = True
         retry["repaired_missing"] = missing
         return retry

@@ -57,7 +57,7 @@ test('artemis runtime import probe checks config dependencies', () => {
   // passed the old probe and produced an unrecoverable boot loop.
   assert.match(probe, /\bimport dotenv\b/)
   assert.match(probe, /\bimport artemis_cli\.config\b/)
-  // Half-renamed Hermes leftovers must fail the probe instead of launching.
+  // Half-renamed leftovers must fail the probe instead of launching.
   assert.match(probe, /\bis_nous_artemis_non_agentic\b/)
   assert.match(probe, /_ARTEMIS_PROVIDER_ENV_BLOCKLIST/)
   // Incomplete agent swaps that omit tui_gateway must fail usable-runtime.

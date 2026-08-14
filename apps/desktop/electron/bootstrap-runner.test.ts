@@ -69,16 +69,15 @@ test('installedAgentInstallScript resolves the installer in the agent checkout',
   }
 })
 
-test('installedAgentInstallScript falls back to hermes-agent checkout', () => {
+test('installedAgentInstallScript ignores a checkout that is not artemis-agent', () => {
   const home = mkTmpHome()
 
   try {
-    const scriptsDir = path.join(home, 'hermes-agent', 'scripts')
+    const scriptsDir = path.join(home, 'legacy-agent', 'scripts')
     fs.mkdirSync(scriptsDir, { recursive: true })
-    const scriptPath = path.join(scriptsDir, SCRIPT_NAME)
-    fs.writeFileSync(scriptPath, '#!/bin/sh\necho hi\n')
+    fs.writeFileSync(path.join(scriptsDir, SCRIPT_NAME), '#!/bin/sh\necho hi\n')
 
-    assert.equal(installedAgentInstallScript(home), scriptPath)
+    assert.equal(installedAgentInstallScript(home), null)
   } finally {
     fs.rmSync(home, { recursive: true, force: true })
   }

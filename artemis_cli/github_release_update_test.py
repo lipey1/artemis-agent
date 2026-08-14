@@ -57,7 +57,6 @@ class GithubReleaseUpdateTests(unittest.TestCase):
             body = dest.read_text(encoding="ascii")
             self.assertEqual(dest, scripts / "artemis.cmd")
             self.assertIn("-m artemis_cli.main", body)
-            self.assertNotIn("hermes_cli", body)
 
     def test_refresh_cli_bootstraps_ensurepip_when_pip_missing(self):
         with tempfile.TemporaryDirectory() as raw:

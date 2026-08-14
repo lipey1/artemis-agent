@@ -38,7 +38,6 @@ import fsp from 'node:fs/promises'
 import https from 'node:https'
 import path from 'node:path'
 
-import { hasStaleHermesHalfRename } from './stale-hermes-runtime'
 import { hiddenWindowsChildOptions } from './windows-child-options'
 import { officialRepoRawUrl } from './update-remote'
 
@@ -194,7 +193,7 @@ function bootstrapCacheDir(artemisHome) {
 }
 
 // The install.sh / install.ps1 that ships inside the already-installed agent
-// checkout (artemis-agent preferred; artemis-agent legacy). Used as a last-resort
+// checkout (artemis-agent). Used as a last-resort
 // fallback when the pinned commit can't be fetched from GitHub (e.g. a
 // locally-built desktop app stamped to an unpushed HEAD).
 function installedAgentInstallScript(artemisHome) {
@@ -203,16 +202,13 @@ function installedAgentInstallScript(artemisHome) {
   }
 
   const scriptName = installScriptName()
-  for (const folder of ['artemis-agent', 'hermes-agent']) {
-    const candidate = path.join(artemisHome, folder, 'scripts', scriptName)
-    try {
-      fs.accessSync(candidate, fs.constants.R_OK)
-      return candidate
-    } catch {
-      // try next
-    }
+  const candidate = path.join(artemisHome, 'artemis-agent', 'scripts', scriptName)
+  try {
+    fs.accessSync(candidate, fs.constants.R_OK)
+    return candidate
+  } catch {
+    return null
   }
-  return null
 }
 
 function hasExistingGitCheckout(activeRoot) {
@@ -912,28 +908,6 @@ async function runBootstrap(opts) {
   })
 
   try {
-    // Quarantine half-renamed Hermes leftovers so install.ps1 can clone a
-    // clean Artemis tree at the packaged stamp instead of reusing broken source.
-    if (activeRoot && hasStaleHermesHalfRename(activeRoot)) {
-      const quarantine = `${activeRoot}.stale-hermes-${Date.now()}`
-
-      emit({
-        type: 'log',
-        line:
-          `[bootstrap] quarantining half-renamed Hermes runtime at ${activeRoot} ` +
-          `→ ${quarantine} so first-run can reinstall a clean Artemis agent`
-      })
-
-      try {
-        fs.renameSync(activeRoot, quarantine)
-      } catch (err) {
-        emit({
-          type: 'log',
-          line: `[bootstrap] WARNING: could not quarantine stale Hermes tree: ${err && err.message}`
-        })
-      }
-    }
-
     const existingCheckout = hasExistingGitCheckout(activeRoot)
     const pinCommit = !existingCheckout
 

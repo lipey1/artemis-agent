@@ -13884,15 +13884,14 @@ from artemis_cli.web_routers.profiles import (  # noqa: E402,F401 — legacy re-
 
 _SKILLS_PROFILE_LOCK = threading.RLock()
 
-_SKILL_HOME_ATTRS = ("ARTEMIS_HOME", "HERMES_HOME")
+_SKILL_HOME_ATTRS = ("ARTEMIS_HOME",)
 
 
 def _snapshot_skill_module_home(module) -> tuple[object, object]:
-    """Read the module-level home/skills dirs without assuming the Artemis name.
+    """Read the module-level home/skills dirs from ``ARTEMIS_HOME``.
 
-    Mid-rename engines still export ``HERMES_HOME`` while web_server binds
-    ``ARTEMIS_HOME``. A bare attribute lookup 500s every profile-scoped
-    route (``/api/env``, ``/api/model/info``, OAuth catalog, …).
+    A bare attribute lookup 500s every profile-scoped route (``/api/env``,
+    ``/api/model/info``, OAuth catalog, …).
     """
     home = None
     for attr in _SKILL_HOME_ATTRS:
@@ -13906,8 +13905,6 @@ def _snapshot_skill_module_home(module) -> tuple[object, object]:
 def _bind_skill_module_home(module, profile_dir) -> None:
     skills_dir = profile_dir / "skills"
     setattr(module, "ARTEMIS_HOME", profile_dir)
-    if hasattr(module, "HERMES_HOME"):
-        setattr(module, "HERMES_HOME", profile_dir)
     setattr(module, "SKILLS_DIR", skills_dir)
 
 
@@ -13915,8 +13912,6 @@ def _restore_skill_module_home(module, snapshot: tuple[object, object]) -> None:
     home, skills_dir = snapshot
     if hasattr(module, "ARTEMIS_HOME"):
         setattr(module, "ARTEMIS_HOME", home)
-    if hasattr(module, "HERMES_HOME"):
-        setattr(module, "HERMES_HOME", home)
     if hasattr(module, "SKILLS_DIR"):
         setattr(module, "SKILLS_DIR", skills_dir)
 

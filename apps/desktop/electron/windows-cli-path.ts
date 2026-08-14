@@ -16,7 +16,6 @@ export const WINDOWS_CLI_SHIM_NAME = 'artemis.cmd'
 export function resolveWindowsCliBinDir(env: NodeJS.ProcessEnv = process.env): string {
   const home =
     env.ARTEMIS_HOME ||
-    env.HERMES_HOME ||
     (env.LOCALAPPDATA ? path.join(env.LOCALAPPDATA, 'artemis') : path.join(os.homedir(), '.artemis'))
   return path.join(home, 'bin')
 }

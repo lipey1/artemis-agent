@@ -49,7 +49,6 @@ import { shouldLatchBackendStartFailure, shouldLatchRemoteReauthFailure } from '
 import { detectRemoteDisplay, isWindowsBinaryPathInWsl, isWslEnvironment } from './bootstrap-platform'
 import { decideBootstrapRepair } from './bootstrap-repair-guard'
 import { runBootstrap } from './bootstrap-runner'
-import { hasStaleHermesHalfRename } from './stale-hermes-runtime'
 import { applyConnectionChange, resolveTerminalConnection } from './connection-apply'
 import {
   authModeFromStatus,
@@ -576,9 +575,6 @@ function resolveArtemisHome() {
   if (process.env.ARTEMIS_HOME) {
     return normalizeArtemisHomeRoot(process.env.ARTEMIS_HOME)
   }
-  if (process.env.HERMES_HOME) {
-    return normalizeArtemisHomeRoot(process.env.HERMES_HOME)
-  }
 
   if (USER_DATA_OVERRIDE) {
     return path.join(path.resolve(USER_DATA_OVERRIDE), 'artemis-home')
@@ -592,7 +588,7 @@ function resolveArtemisHome() {
     // inference provider configured" despite a valid configured home (#45471).
     // Consult the live User-scoped registry value before the default below.
     const fromRegistry =
-      readWindowsUserEnvVar('ARTEMIS_HOME') || readWindowsUserEnvVar('HERMES_HOME')
+      readWindowsUserEnvVar('ARTEMIS_HOME')
 
     if (fromRegistry) {
       return normalizeArtemisHomeRoot(fromRegistry)
@@ -628,15 +624,9 @@ function pathWithArtemisManagedNode(...entries) {
   return [...managed, ...entries, process.env.PATH].filter(Boolean).join(path.delimiter)
 }
 
-// ACTIVE_ARTEMIS_ROOT — the canonical mutable agent install. Prefer
-// artemis-agent (Artemis product layout); fall back to hermes-agent for one
-// release so existing checkouts keep working without a blind identifier rename.
+// ACTIVE_ARTEMIS_ROOT — the canonical mutable agent install.
 function resolveActiveAgentRoot(artemisHome: string): string {
-  const preferred = path.join(artemisHome, 'artemis-agent')
-  const legacy = path.join(artemisHome, 'hermes-agent')
-  if (directoryExists(preferred)) return preferred
-  if (directoryExists(legacy)) return legacy
-  return preferred
+  return path.join(artemisHome, 'artemis-agent')
 }
 
 const ACTIVE_ARTEMIS_ROOT = resolveActiveAgentRoot(ARTEMIS_HOME)
@@ -3862,12 +3852,6 @@ function readBootstrapMarker() {
 // "already installed" off the filesystem alone, not just the marker.
 function isActiveRuntimeUsable() {
   const venvPython = getVenvPython(VENV_ROOT)
-
-  // Half-renamed Hermes→Artemis trees look installed but ImportError at runtime.
-  // Treat them as unusable so first-run / repair bootstrap replaces the source.
-  if (hasStaleHermesHalfRename(ACTIVE_ARTEMIS_ROOT)) {
-    return false
-  }
 
   return (
     isArtemisSourceRoot(ACTIVE_ARTEMIS_ROOT) &&
