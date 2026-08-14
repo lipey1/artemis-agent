@@ -103,13 +103,6 @@ fi
 
 export ARTEMIS_ENGINE_ROOT="$ROOT"
 
-if [[ "${1:-}" == "update" ]]; then
-  echo "Artemis updates come from GitHub Releases."
-  echo "  https://github.com/lipey1/artemis-agent/releases/latest"
-  echo "Download the asset for your OS and install it over the current build."
-  exit 0
-fi
-
 # Real CLI entry (Python module). Prefer console script if it is not this bash wrapper.
 if [[ -x "$CLI_BIN" ]] && ! head -1 "$CLI_BIN" | grep -q 'bash'; then
   exec "$CLI_BIN" "$@"

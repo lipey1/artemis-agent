@@ -19,9 +19,7 @@ if defined ARTEMIS_HOME (
 set "ROOT="
 if defined ARTEMIS_ROOT if exist "%ARTEMIS_ROOT%\venv\Scripts\python.exe" set "ROOT=%ARTEMIS_ROOT%"
 if not defined ROOT if exist "%HOME_DIR%\artemis-agent\venv\Scripts\python.exe" set "ROOT=%HOME_DIR%\artemis-agent"
-if not defined ROOT if exist "%HOME_DIR%\hermes-agent\venv\Scripts\python.exe" set "ROOT=%HOME_DIR%\hermes-agent"
 if not defined ROOT if exist "%USERPROFILE%\.artemis\artemis-agent\venv\Scripts\python.exe" set "ROOT=%USERPROFILE%\.artemis\artemis-agent"
-if not defined ROOT if exist "%USERPROFILE%\.artemis\hermes-agent\venv\Scripts\python.exe" set "ROOT=%USERPROFILE%\.artemis\hermes-agent"
 
 REM Fast path: plain `artemis desktop` / `artemis gui` -> installed Desktop.
 if /I not "%~1"=="desktop" if /I not "%~1"=="gui" goto run_engine
@@ -47,13 +45,6 @@ if not exist "%ROOT%\venv\Scripts\python.exe" goto no_engine
 
 set "PY=%ROOT%\venv\Scripts\python.exe"
 set "ARTEMIS_ENGINE_ROOT=%ROOT%"
-
-if /I "%~1"=="update" (
-  echo Artemis updates come from GitHub Releases.
-  echo   https://github.com/lipey1/artemis-agent/releases/latest
-  echo Download the asset for your OS and install it over the current build.
-  exit /b 0
-)
 
 if exist "%ROOT%\artemis" (
   "%PY%" "%ROOT%\artemis" %*

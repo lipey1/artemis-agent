@@ -1478,11 +1478,19 @@ OFFICIAL_REPO_URL = "https://github.com/lipey1/artemis-agent.git"
 ARTEMIS_RELEASES_URL = "https://github.com/lipey1/artemis-agent/releases"
 
 
-def _artemis_blocks_upstream_git_update() -> bool:
-    """Artemis installs must not git-pull the upstream agent repo."""
-    print("Artemis updates come from GitHub Releases, not the upstream git repo.")
-    print(f"  Open: {ARTEMIS_RELEASES_URL}/latest")
-    print("  Download the asset for your OS and install over the current build.")
+def _artemis_apply_github_release_update(*, check_only: bool = False, force: bool = False) -> bool:
+    """Apply (or check) updates from GitHub Releases instead of git pull.
+
+    Returns True so the git-based update path is skipped.
+    """
+    from artemis_cli.github_release_update import (
+        apply_github_release_update,
+        check_github_release_update,
+    )
+
+    code = check_github_release_update() if check_only else apply_github_release_update(force=force)
+    if code:
+        sys.exit(code)
     return True
 
 
@@ -2261,7 +2269,7 @@ def _run_logged_subprocess(cmd, *, cwd=None, env=None):
     return result
 
 def _cmd_update_check(branch: str = "main", *, branch_explicit: bool = False):
-    if _artemis_blocks_upstream_git_update():
+    if _artemis_apply_github_release_update(check_only=True):
         return
     """Implement ``artemis update --check``: fetch and report without installing.
 
@@ -3841,7 +3849,7 @@ def _normalize_managed_eol(git_cmd, repo_root):
         pass
 
 def _cmd_update_impl(args, gateway_mode: bool):
-    if _artemis_blocks_upstream_git_update():
+    if _artemis_apply_github_release_update(force=bool(getattr(args, "force", False))):
         return
     """Body of ``cmd_update`` — kept separate so the wrapper can always
     restore stdio even on ``sys.exit``."""

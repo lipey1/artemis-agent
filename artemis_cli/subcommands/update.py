@@ -17,7 +17,7 @@ def build_update_parser(subparsers, *, cmd_update: Callable) -> None:
     update_parser = subparsers.add_parser(
         "update",
         help="Update Artemis Agent to the latest version",
-        description="Pull the latest changes from git and reinstall dependencies",
+        description="Download the latest GitHub Release and install it over the current build",
     )
     update_parser.add_argument(
         "--gateway",
