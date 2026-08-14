@@ -240,21 +240,23 @@ function IdleView({
         <DialogDescription className="text-center text-sm">{body}</DialogDescription>
       </div>
 
-      <div className="grid gap-3">
-        {groups.map(group => (
-          <div key={group.id}>
-            <p className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</p>
-            <ul className="mt-1.5 grid gap-1.5 text-xs text-foreground">
-              {group.items.map(item => (
-                <li className="flex items-start gap-2" key={item}>
-                  <span aria-hidden className="mt-1.5 inline-block size-1 shrink-0 rounded-full bg-primary" />
-                  <span className="leading-snug">{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
+      {groups.length > 0 && (
+        <div className="grid gap-3">
+          {groups.map(group => (
+            <div key={group.id}>
+              <p className="text-[0.625rem] font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</p>
+              <ul className="mt-1.5 grid gap-1.5 text-xs text-foreground">
+                {group.items.map(item => (
+                  <li className="flex items-start gap-2" key={item}>
+                    <span aria-hidden className="mt-1.5 inline-block size-1 shrink-0 rounded-full bg-primary" />
+                    <span className="leading-snug">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="grid gap-2">
         <Button className="font-semibold" onClick={onInstall} size="lg">
@@ -265,7 +267,9 @@ function IdleView({
         </Button>
       </div>
 
-      {remaining > 0 && <p className="text-center text-xs text-muted-foreground">{u.moreChanges(remaining)}</p>}
+      {remaining > 0 && shownItems > 0 && (
+        <p className="text-center text-xs text-muted-foreground">{u.moreChanges(remaining)}</p>
+      )}
     </div>
   )
 }

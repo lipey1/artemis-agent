@@ -210,6 +210,7 @@ import {
   sandboxPreflight
 } from './update-relaunch'
 import { applyDebReleaseUpdate, isDebInstall } from './update-deb-install'
+import { commitsFromReleaseNotes, parseGitHubReleaseNotes } from './github-release-notes'
 import { isOfficialSshRemote, OFFICIAL_REPO_HTTPS_URL } from './update-remote'
 import {
   resolvePythonUpdateHandoff,
@@ -217,6 +218,7 @@ import {
   resolveUpdateScriptHandoff,
   spawnUpdaterProcess,
   stagedUpdaterSupportsPrewrittenMarker,
+  windowsUpdateHandoffEnv,
   wrapHandoffForDetachedConsole
 } from './updater-process'
 import { formatBlockerMessage, formatProbeFailedMessage, scanVenvBlockers } from './venv-blocker-scan'
@@ -2602,7 +2604,10 @@ async function checkUpdates() {
       }
       return 0
     }
-    const behind = tag && localVersion && cmp(tag, localVersion) > 0 ? 1 : 0
+    const fetchedAt = Date.now()
+    const commits = commitsFromReleaseNotes(parseGitHubReleaseNotes(payload.body), tag, fetchedAt)
+    const newer = Boolean(tag && localVersion && cmp(tag, localVersion) > 0)
+    const behind = newer ? Math.max(commits.length, 1) : 0
     return {
       supported: true,
       branch: 'main',
@@ -2610,10 +2615,10 @@ async function checkUpdates() {
       updateAvailable: behind > 0,
       currentSha: localVersion || undefined,
       targetSha: tag || undefined,
-      commits: [],
+      commits,
       dirty: false,
       artemisRoot: updateRoot,
-      fetchedAt: Date.now(),
+      fetchedAt,
       message: behind > 0
         ? IS_LINUX && isDebInstall(process.execPath, process.env)
           ? `Artemis ${tag} is available. Click Update now to install the .deb.`
@@ -3059,12 +3064,12 @@ async function applyUpdates(opts = {}) {
       ])
 
       child = spawnUpdaterProcess(wrapped.command, wrapped.args, {
-        cwd: ARTEMIS_HOME,
-        env: {
-          ...process.env,
-          ARTEMIS_HOME,
-          PATH: pathWithArtemisManagedNode(venvBin)
-        },
+        cwd: updateRoot,
+        env: windowsUpdateHandoffEnv(process.env, {
+          artemisHome: ARTEMIS_HOME,
+          path: pathWithArtemisManagedNode(venvBin),
+          updateRoot
+        }),
         detached: true,
         stdio: 'ignore'
       })
@@ -3087,13 +3092,12 @@ async function applyUpdates(opts = {}) {
       const wrapped = wrapHandoffForDetachedConsole(pythonHandoff, [])
 
       child = spawnUpdaterProcess(wrapped.command, wrapped.args, {
-        cwd: ARTEMIS_HOME,
-        env: {
-          ...process.env,
-          ARTEMIS_HOME,
-          ARTEMIS_ENGINE_ROOT: updateRoot,
-          PATH: pathWithArtemisManagedNode(venvBin)
-        },
+        cwd: updateRoot,
+        env: windowsUpdateHandoffEnv(process.env, {
+          artemisHome: ARTEMIS_HOME,
+          path: pathWithArtemisManagedNode(venvBin),
+          updateRoot
+        }),
         detached: true,
         stdio: 'ignore'
       })

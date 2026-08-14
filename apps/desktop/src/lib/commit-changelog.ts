@@ -76,8 +76,6 @@ const HIDDEN_TYPES = new Set([
   'wip'
 ])
 
-const FALLBACK_GROUP: CommitGroup = { id: 'other', items: ['Improvements and fixes'], label: 'In this update' }
-
 const CONVENTIONAL_HEADER = /^(?<type>[a-zA-Z][a-zA-Z0-9_-]*)(?:\((?<scope>[^)]+)\))?(?<bang>!)?:\s+(?<subject>.+)$/
 
 /** Parse a single commit header line per Conventional Commits 1.0. */
@@ -117,8 +115,8 @@ function tidySubject(subject: string): string {
 
 /**
  * Build a small grouped changelog from a list of raw commits.
- * Always returns at least one group; falls back to a neutral placeholder
- * when every commit was filtered or unparseable.
+ * Returns [] when every commit was filtered or the list is empty, so the
+ * overlay can omit notes instead of inventing "Improvements and fixes".
  */
 export function buildCommitChangelog(
   commits: readonly CommitChangelogInput[] | undefined,
@@ -171,8 +169,8 @@ export function buildCommitChangelog(
     .slice(0, maxGroups)
     .map(({ id, items, label }): CommitGroup => ({ id, items, label }))
 
-  if (result.length === 0) {
-    return [FALLBACK_GROUP]
+  if (result.length === 1 && result[0].id === 'other') {
+    return [{ ...result[0], label: 'In this update' }]
   }
 
   return result

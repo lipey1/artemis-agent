@@ -20,6 +20,24 @@ export interface UpdateScriptHandoff {
   scriptPath: string
 }
 
+/** Env for the detached Windows update hand-off (script or python). */
+export function windowsUpdateHandoffEnv(
+  base: NodeJS.ProcessEnv | Record<string, string | undefined>,
+  opts: { artemisHome: string; path: string; updateRoot: string }
+): Record<string, string | undefined> {
+  const pythonPath = [opts.updateRoot, base.PYTHONPATH].filter(Boolean).join(path.delimiter)
+
+  return {
+    ...base,
+    ARTEMIS_ENGINE_ROOT: opts.updateRoot,
+    ARTEMIS_HOME: opts.artemisHome,
+    PATH: opts.path,
+    PYTHONIOENCODING: 'utf-8',
+    PYTHONPATH: pythonPath,
+    PYTHONUTF8: '1'
+  }
+}
+
 /**
  * Repo-owned Windows update hand-off (frozen-binary escape hatch).
  *

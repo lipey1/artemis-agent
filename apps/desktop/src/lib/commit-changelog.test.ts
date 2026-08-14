@@ -74,10 +74,17 @@ describe('buildCommitChangelog', () => {
     expect(groups[0].items).toEqual(['Update sidebar styling'])
   })
 
-  it('falls back to a neutral placeholder when every commit is filtered or empty', () => {
-    const groups = buildCommitChangelog([{ summary: 'chore: bump' }, { summary: 'ci: stuff' }])
+  it('returns no groups when every commit is filtered or empty', () => {
+    expect(buildCommitChangelog([{ summary: 'chore: bump' }, { summary: 'ci: stuff' }])).toEqual([])
+    expect(buildCommitChangelog([])).toEqual([])
+  })
 
-    expect(groups).toEqual([{ id: 'other', items: ['Improvements and fixes'], label: 'In this update' }])
+  it('labels a notes-only list as In this update', () => {
+    const groups = buildCommitChangelog([{ summary: 'Settings nav no longer leaves a hole' }])
+
+    expect(groups).toEqual([
+      { id: 'other', items: ['Settings nav no longer leaves a hole'], label: 'In this update' }
+    ])
   })
 
   it('dedupes identical subjects and caps the items per group', () => {

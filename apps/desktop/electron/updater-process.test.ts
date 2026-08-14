@@ -11,6 +11,7 @@ import {
   resolveUpdateScriptHandoff,
   spawnUpdaterProcess,
   stagedUpdaterSupportsPrewrittenMarker,
+  windowsUpdateHandoffEnv,
   wrapHandoffForDetachedConsole
 } from './updater-process'
 
@@ -255,4 +256,19 @@ test('wrapHandoffForDetachedConsole routes through cmd start with own console', 
     '-Branch',
     'main'
   ])
+})
+
+test('windowsUpdateHandoffEnv puts the engine root on PYTHONPATH', () => {
+  const env = windowsUpdateHandoffEnv(
+    { PATH: 'C:\\Windows', PYTHONPATH: 'C:\\old' },
+    {
+      artemisHome: String.raw`C:\Users\artemis\AppData\Local\artemis`,
+      path: 'C:\\venv;C:\\Windows',
+      updateRoot: String.raw`C:\Users\artemis\AppData\Local\artemis\artemis-agent`
+    }
+  )
+
+  assert.equal(env.ARTEMIS_ENGINE_ROOT, String.raw`C:\Users\artemis\AppData\Local\artemis\artemis-agent`)
+  assert.match(String(env.PYTHONPATH), /artemis-agent/)
+  assert.equal(env.PYTHONUTF8, '1')
 })
