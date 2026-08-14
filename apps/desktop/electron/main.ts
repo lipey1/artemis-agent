@@ -2952,7 +2952,7 @@ async function applyUpdates(opts = {}) {
     emitUpdateProgress({
       stage: 'restart',
       message:
-        'Updating Artemis — this window will close and the updater will open. Don’t reopen Artemis yourself; it restarts automatically when the update finishes.',
+        'Updating Artemis: this window will close and the updater will open. Do not reopen Artemis yourself; it restarts automatically when the update finishes.',
       percent: 100
     })
     repairMacUpdaterHelper(updater)
