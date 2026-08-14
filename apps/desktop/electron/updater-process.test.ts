@@ -6,6 +6,7 @@ import { test } from 'vitest'
 
 import {
   MARKER_SELF_ADOPT_EPOCH_MS,
+  resolvePythonUpdateHandoff,
   resolveStagedUpdaterBinary,
   resolveUpdateScriptHandoff,
   spawnUpdaterProcess,
@@ -196,6 +197,28 @@ test('resolveUpdateScriptHandoff is Windows-only (POSIX updates in place)', () =
   const handoff = resolveUpdateScriptHandoff('/home/artemis/.artemis/artemis-agent', {
     isWindows: false,
     fileExists: () => true
+  })
+
+  assert.equal(handoff, null)
+})
+
+test('resolvePythonUpdateHandoff uses venv python artemis update on Windows', () => {
+  const root = String.raw`C:\Users\artemis\AppData\Local\artemis\artemis-agent`
+  const python = path.join(root, 'venv', 'Scripts', 'python.exe')
+  const handoff = resolvePythonUpdateHandoff(root, {
+    isWindows: true,
+    fileExists: candidate => candidate === python
+  })
+
+  assert.ok(handoff)
+  assert.equal(handoff.command, python)
+  assert.deepEqual(handoff.args, ['-m', 'artemis_cli.main', 'update', '--yes', '--force'])
+})
+
+test('resolvePythonUpdateHandoff returns null when venv python is missing', () => {
+  const handoff = resolvePythonUpdateHandoff(String.raw`C:\Users\artemis\AppData\Local\artemis\artemis-agent`, {
+    isWindows: true,
+    fileExists: () => false
   })
 
   assert.equal(handoff, null)

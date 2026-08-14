@@ -212,6 +212,7 @@ import {
 import { applyDebReleaseUpdate, isDebInstall } from './update-deb-install'
 import { isOfficialSshRemote, OFFICIAL_REPO_HTTPS_URL } from './update-remote'
 import {
+  resolvePythonUpdateHandoff,
   resolveStagedUpdaterBinary,
   resolveUpdateScriptHandoff,
   spawnUpdaterProcess,
@@ -2616,7 +2617,7 @@ async function checkUpdates() {
       message: behind > 0
         ? IS_LINUX && isDebInstall(process.execPath, process.env)
           ? `Artemis ${tag} is available. Click Update now to install the .deb.`
-          : `Artemis ${tag} is available. Download from https://github.com/lipey1/artemis-agent/releases/latest`
+          : `Artemis ${tag} is available. Click Update now to install.`
         : undefined,
       releaseUrl: 'https://github.com/lipey1/artemis-agent/releases/latest',
       debInstall: IS_LINUX && isDebInstall(process.execPath, process.env)
@@ -2895,23 +2896,13 @@ async function applyUpdates(opts = {}) {
     }
 
     if (!updater) {
-      // No staged updater binary — this is a CLI-installed user (they ran
-      // `artemis desktop`, never the Tauri installer that self-copies
-      // artemis-setup.exe into ARTEMIS_HOME). On Windows the repo hand-off
-      // script serves them just as well as installer users — it only needs
-      // PowerShell and the checkout — so fall through to the normal hand-off
-      // when the script exists. Only when the checkout predates the script do
-      // we surface the manual one-liner.
+      // NSIS / CLI Windows installs do not stage artemis-setup.exe. Prefer the
+      // repo hand-off script, then the same GitHub Release path as `artemis update`.
       const updateRoot = resolveUpdateRoot()
+      const scriptHandoff = resolveUpdateScriptHandoff(updateRoot)
+      const pythonHandoff = resolvePythonUpdateHandoff(updateRoot)
 
-      if (!resolveUpdateScriptHandoff(updateRoot)) {
-        // They DO have a working `artemis` on PATH / in the venv, so the
-        // correct path is the one-liner in their native medium. We show the
-        // EXACT command, branch-pinned to the checkout they're on — bare
-        // `artemis update` defaults to main and would silently switch a
-        // bb/gui (or any non-main) install off-branch. Mirror the GUI
-        // button's contract: append --branch <current> for non-main
-        // checkouts, keep it bare for main so the card stays clean.
+      if (!scriptHandoff && !pythonHandoff) {
         let command = 'artemis update'
 
         try {
@@ -2929,13 +2920,15 @@ async function applyUpdates(opts = {}) {
           // Best-effort: fall back to bare `artemis update` if branch detection fails.
         }
 
-        rememberLog(`[updates] no staged updater; surfacing manual \`${command}\` for CLI install at ${updateRoot}`)
+        rememberLog(`[updates] no staged updater or engine python; surfacing manual \`${command}\` at ${updateRoot}`)
         emitUpdateProgress({ stage: 'manual', message: command, percent: null })
 
         return { ok: true, manual: true, command, artemisRoot: updateRoot }
       }
 
-      rememberLog('[updates] no staged updater; using repo hand-off script for CLI install')
+      rememberLog(
+        `[updates] no staged updater; using ${scriptHandoff ? 'repo hand-off script' : 'artemis update (python)'} for Windows install`
+      )
     }
 
     const handoffConflict = updateHandoffConflict(ARTEMIS_HOME)
@@ -3043,6 +3036,7 @@ async function applyUpdates(opts = {}) {
     // next one. Checkouts that predate the script fall back to the binary
     // path unchanged.
     const scriptHandoff = resolveUpdateScriptHandoff(updateRoot)
+    const pythonHandoff = resolvePythonUpdateHandoff(updateRoot)
     let child
 
     if (scriptHandoff) {
@@ -3088,6 +3082,28 @@ async function applyUpdates(opts = {}) {
 
       rememberLog(
         `[updates] launched repo hand-off script: ${scriptHandoff.scriptPath} (branch ${branch}); exiting desktop to release venv shim`
+      )
+    } else if (pythonHandoff) {
+      const wrapped = wrapHandoffForDetachedConsole(pythonHandoff, [])
+
+      child = spawnUpdaterProcess(wrapped.command, wrapped.args, {
+        cwd: ARTEMIS_HOME,
+        env: {
+          ...process.env,
+          ARTEMIS_HOME,
+          ARTEMIS_ENGINE_ROOT: updateRoot,
+          PATH: pathWithArtemisManagedNode(venvBin)
+        },
+        detached: true,
+        stdio: 'ignore'
+      })
+
+      if (Number.isInteger(child.pid)) {
+        writeUpdateMarker(ARTEMIS_HOME, child.pid)
+      }
+
+      rememberLog(
+        `[updates] launched artemis update via ${pythonHandoff.scriptPath}; exiting desktop to release venv shim`
       )
     } else {
       child = spawnUpdaterProcess(updater, updaterArgs, {

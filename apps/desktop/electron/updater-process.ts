@@ -62,6 +62,34 @@ export function resolveUpdateScriptHandoff(
 }
 
 /**
+ * Last-resort Windows hand-off when the checkout has no desktop-update.ps1:
+ * run the same GitHub Release updater the CLI uses (`artemis update`).
+ */
+export function resolvePythonUpdateHandoff(
+  updateRoot: string,
+  deps: ResolveUpdateScriptHandoffDeps = {}
+): UpdateScriptHandoff | null {
+  const isWindows = deps.isWindows ?? process.platform === 'win32'
+
+  if (!isWindows) {
+    return null
+  }
+
+  const pythonPath = path.join(updateRoot, 'venv', 'Scripts', 'python.exe')
+  const exists = deps.fileExists ?? stagedFileExists
+
+  if (!exists(pythonPath)) {
+    return null
+  }
+
+  return {
+    command: pythonPath,
+    args: ['-m', 'artemis_cli.main', 'update', '--yes', '--force'],
+    scriptPath: pythonPath
+  }
+}
+
+/**
  * Wrap a PowerShell hand-off invocation so it survives a detached, hidden
  * spawn from Electron.
  *
