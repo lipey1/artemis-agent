@@ -275,7 +275,6 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
       },
       {
         active: activeView === 'about',
-        gapBefore: true,
         icon: Info,
         id: 'about',
         label: t.settings.nav.about,

@@ -117,7 +117,8 @@ import {
   titlebarControlsPosition,
   titlebarControlsYNudge,
   titlebarToolsRightCss,
-  titlebarToolsWidthCss
+  titlebarToolsWidthCss,
+  TITLEBAR_RIGHT_CLUSTER_COUNT
 } from '../shell/titlebar'
 import { TitlebarControls } from '../shell/titlebar-controls'
 import { UpdatesOverlay } from '../updates-overlay'
@@ -995,9 +996,8 @@ export function ContribWiring({ children }: { children: ReactNode }) {
   // Pane-registered tools (preview's monitor/devtools cluster) anchor flush
   // against the static system cluster — in the tree layout the titlebar band
   // sits ABOVE the grid, so AppShell's pane-width anchoring doesn't apply.
-  const SYSTEM_TOOL_COUNT = 4
   const paneToolCount = rightTitlebarTools.filter(tool => !tool.hidden).length
-  const systemToolsWidth = titlebarToolsWidthCss(SYSTEM_TOOL_COUNT)
+  const systemToolsWidth = titlebarToolsWidthCss(TITLEBAR_RIGHT_CLUSTER_COUNT)
 
   const titlebarToolsWidth =
     paneToolCount > 0 ? `calc(${systemToolsWidth} + ${titlebarToolsWidthCss(paneToolCount)})` : systemToolsWidth

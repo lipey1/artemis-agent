@@ -2,7 +2,6 @@ import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef,
 
 /** Clamp to the same mins the window was created with (spawnHudWindow). */
 const HUD_MIN_WIDTH = 380
-const HUD_MIN_HEIGHT = 160
 
 interface ResizeState {
   startX: number
@@ -71,13 +70,14 @@ export function useHudResizeHandle(): {
       event.preventDefault()
 
       const dx = event.screenX - state.startX
-      const dy = event.screenY - state.startY
 
       window.artemisDesktop?.hud?.setBounds?.({
         x: state.originX,
         y: state.originY,
         width: Math.max(HUD_MIN_WIDTH, state.originW + dx),
-        height: Math.max(HUD_MIN_HEIGHT, state.originH + dy)
+        // Height tracks the pill + transcript. Dragging it open again is how
+        // the empty dark slab came back.
+        height: state.originH
       })
     }
 

@@ -43,7 +43,7 @@ import {
   sessionPinId,
   shouldMigrateComposerScope
 } from '@/store/session'
-import { isAuxiliaryWindow, isWatchWindow } from '@/store/windows'
+import { isAuxiliaryWindow, isHudWindow, isWatchWindow } from '@/store/windows'
 import type { ModelOptionsResponse } from '@/types/artemis'
 
 import { primaryRouteSelectedSessionId, routeSessionId } from '../routes'
@@ -502,17 +502,20 @@ export const ChatView = memo(function ChatView({
 
   const overlayKind: DragKind = dragKind === 'files' ? 'files' : sessionDragging && !sessionEdgeHover ? 'session' : null
 
+  const hudWindow = isHudWindow()
+
   return (
     <div
       className={cn(
-        'relative isolate flex h-full min-w-0 flex-col overflow-hidden bg-(--ui-chat-surface-background)',
+        'relative isolate flex h-full min-w-0 flex-col overflow-hidden',
+        !hudWindow && 'bg-(--ui-chat-surface-background)',
         className
       )}
       data-chat-surface=""
       data-composer-target={composerScope.target}
       data-session-anchor={sessionAnchor}
     >
-      <Backdrop />
+      {!hudWindow && <Backdrop />}
       {/* Tiles get their chrome from the layout zone (chip strip); the modal
           prompt overlays stay active-session-scoped in the primary surface. */}
       {isPrimary && (

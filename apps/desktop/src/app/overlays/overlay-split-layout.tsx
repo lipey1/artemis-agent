@@ -158,7 +158,7 @@ export function OverlayNav({ footer, groups }: { footer?: ReactNode; groups: Ove
       <OverlaySidebar className={RAIL_HIDDEN}>
         {groups.map(group => (
           <Fragment key={group.id}>
-            {group.gapBefore && <div aria-hidden className="h-2" />}
+            {group.gapBefore && <div aria-hidden className="h-2 shrink-0" />}
             <OverlayNavItem active={group.active} icon={group.icon} label={group.label} onClick={group.onSelect} />
             {group.children && group.active && (
               <div className="ml-3.5 flex flex-col gap-0.5 pl-1.5">

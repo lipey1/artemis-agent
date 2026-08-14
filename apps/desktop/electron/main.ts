@@ -8986,7 +8986,11 @@ let hudProfile = null
 // moves or resizes the HUD, hud-state.json wins (same pattern as the main
 // window's window-state.json).
 const HUD_WIDTH = 620
-const HUD_HEIGHT = 320
+// Compact first paint — just the pill + chip strip. Height then tracks the
+// composer and transcript; a tall default was the empty dark slab.
+const HUD_HEIGHT = 104
+const HUD_MIN_WIDTH = 380
+const HUD_MIN_HEIGHT = 72
 const HUD_BOTTOM_MARGIN = 72
 const HUD_STATE_PATH = path.join(app.getPath('userData'), 'hud-state.json')
 
@@ -8995,11 +8999,10 @@ function readHudState() {
     const raw = JSON.parse(fs.readFileSync(HUD_STATE_PATH, 'utf8'))
 
     if (
-      [raw?.x, raw?.y, raw?.width, raw?.height].every(v => Number.isFinite(v)) &&
-      raw.width >= 380 &&
-      raw.height >= 160
+      [raw?.x, raw?.y, raw?.width].every(v => Number.isFinite(v)) &&
+      raw.width >= HUD_MIN_WIDTH
     ) {
-      return raw
+      return { x: raw.x, y: raw.y, width: raw.width, height: HUD_HEIGHT }
     }
   } catch {
     // First run / unreadable — fall through to defaults.
@@ -9185,11 +9188,15 @@ function broadcastHudState(open) {
 function spawnHudWindow(sessionId, profile) {
   const win = new BrowserWindow({
     ...hudBounds(),
-    minWidth: 380,
-    minHeight: 160,
+    minWidth: HUD_MIN_WIDTH,
+    minHeight: HUD_MIN_HEIGHT,
     title: HUD_WINDOW_TITLE,
     frame: false,
     transparent: true,
+    // Win11 DWM rounded chrome + Mica/Acrylic tint the whole HWND (a smoked
+    // rectangle with the desktop showing through). HUD paints only the pill
+    // and transcript band; the window itself must be per-pixel clear.
+    ...(IS_WINDOWS ? { backgroundMaterial: 'none', roundedCorners: false } : { roundedCorners: true }),
     // NOT resizable. A transparent frameless window on Windows keeps a
     // system-level edge resize hot-zone while `resizable` is on — the OS
     // interprets pointer capture near the edge as a resize gesture, so the
@@ -9210,13 +9217,11 @@ function spawnHudWindow(sessionId, profile) {
     hasShadow: false,
     alwaysOnTop: true,
     type: IS_MAC ? 'panel' : undefined,
-    // Clips the vibrancy layer to the HUD's silhouette rather than a hard
-    // rectangle — the frost stops where the window's corners do.
-    roundedCorners: true,
     // Vibrancy must keep rendering while the window is BLURRED: streaming under
     // another app is the whole feature, and the default 'followWindow' kills
-    // the frost the moment something else takes focus.
-    visualEffectState: 'active',
+    // the frost the moment something else takes focus. Windows has no vibrancy
+    // here; leaving this on still lets DWM tint the HWND.
+    ...(IS_MAC ? { visualEffectState: 'active' } : {}),
     hiddenInMissionControl: IS_MAC,
     show: false,
     backgroundColor: '#00000000',
@@ -9228,6 +9233,14 @@ function spawnHudWindow(sessionId, profile) {
 
   win.setAlwaysOnTop(true, IS_MAC ? 'floating' : 'screen-saver')
   win.setHiddenInMissionControl?.(true)
+  win.setBackgroundColor('#00000000')
+  if (IS_WINDOWS) {
+    try {
+      win.setBackgroundMaterial('none')
+    } catch {
+      // Electron build without the Win11 material API.
+    }
+  }
 
   try {
     win.setVisibleOnAllWorkspaces(
@@ -10092,8 +10105,8 @@ ipcMain.on('artemis:hud:set-bounds', (event, bounds) => {
   }
 
   const win = hudWindow
-  const width = Math.max(380, Math.round(Number(bounds.width)))
-  const height = Math.max(160, Math.round(Number(bounds.height)))
+  const width = Math.max(HUD_MIN_WIDTH, Math.round(Number(bounds.width)))
+  const height = Math.max(HUD_MIN_HEIGHT, Math.round(Number(bounds.height)))
   const [curW, curH] = win.getSize()
   const resizing = width !== curW || height !== curH
 

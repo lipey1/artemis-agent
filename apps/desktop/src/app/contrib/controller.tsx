@@ -746,7 +746,7 @@ export function ContribController() {
             />
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 left-[calc(var(--titlebar-controls-left,14px)+(var(--titlebar-control-size,24px)*2)+0.75rem)] right-[calc(var(--titlebar-tools-right,0.75rem)+var(--titlebar-tools-width,5.5rem)+0.75rem)] [-webkit-app-region:drag]"
+              className="pointer-events-none absolute inset-y-0 left-[calc(var(--titlebar-controls-left,14px)+(var(--titlebar-control-size,24px)*2)+0.75rem)] right-[calc(var(--titlebar-tools-right,0.75rem)+var(--titlebar-tools-width,calc(4*var(--titlebar-control-size,24px)))+0.75rem)] [-webkit-app-region:drag]"
             />
             <TitlebarSlot
               area="titleBar.left"

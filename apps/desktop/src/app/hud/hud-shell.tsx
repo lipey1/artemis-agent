@@ -48,14 +48,49 @@ const HUD_COLLAPSE_MS = Math.round(HUD_FADE_MS * 0.66)
  *  so an empty transcript measures a true zero instead of a 12px strip. */
 const HUD_SHEET_OVERHANG_PX = 12
 
-/** Ceiling on the transcript band, which still auto-sizes up from 0. It reads
- *  over another app, so it is a glance rather than a panel: whichever of these
- *  is smaller wins, so a tall HUD doesn't turn the band into a second window
- *  and a short one doesn't get swallowed by it. */
+/** Ceiling on the transcript band, which still auto-sizes up from 0. Capped in
+ *  CSS pixels of the band itself, not a fraction of the HUD window — the window
+ *  hugs the pill, so a fraction of innerHeight would collapse the band to nothing. */
 const HUD_BAND_MAX_PX = 152
-const HUD_BAND_MAX_FRACTION = 0.42
 
-const hudBandMaxPx = () => Math.min(window.innerHeight * HUD_BAND_MAX_FRACTION, HUD_BAND_MAX_PX)
+const hudBandMaxPx = () => HUD_BAND_MAX_PX
+
+/** Room under the last painted box for the 1px focus ring. */
+const HUD_FIT_PAD_PX = 8
+
+const HUD_FIT_MIN_HEIGHT = 72
+
+const HUD_FIT_SLOTS =
+  '[data-slot="composer-completion-drawer"], [data-slot="dropdown-menu-content"], [data-slot="popover-content"]'
+
+function fitHudWindow(dock: HTMLElement | null, bandPx: number, resizing: boolean): void {
+  if (resizing || !dock || !window.artemisDesktop?.hud?.setBounds) {
+    return
+  }
+
+  let bottom = dock.getBoundingClientRect().bottom + bandPx
+
+  for (const el of document.querySelectorAll(HUD_FIT_SLOTS)) {
+    if (!(el instanceof HTMLElement) || el.getClientRects().length === 0) {
+      continue
+    }
+
+    bottom = Math.max(bottom, el.getBoundingClientRect().bottom)
+  }
+
+  const height = Math.max(HUD_FIT_MIN_HEIGHT, Math.ceil(bottom + HUD_FIT_PAD_PX))
+
+  if (Math.abs(window.innerHeight - height) <= 2) {
+    return
+  }
+
+  window.artemisDesktop.hud.setBounds({
+    x: window.screenX,
+    y: window.screenY,
+    width: window.outerWidth,
+    height
+  })
+}
 
 /** Composer on top, transcript always hanging below it — Spotlight's shape,
  *  rather than flipping to follow the screen edge the HUD is parked against. */
@@ -260,6 +295,7 @@ export function HudShell() {
   // which is correct, and asking anything looser paints the slab back.
   const [filled, setFilled] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const hudResizingRef = useRef(false)
 
   useEffect(() => {
     const root = rootRef.current
@@ -269,7 +305,17 @@ export function HudShell() {
     }
 
     let viewport: HTMLElement | null = null
+    const extraObserved = new Set<Element>()
     const ro = new ResizeObserver(() => measure())
+
+    const watchExtras = () => {
+      for (const el of document.querySelectorAll(HUD_FIT_SLOTS)) {
+        if (!extraObserved.has(el)) {
+          extraObserved.add(el)
+          ro.observe(el)
+        }
+      }
+    }
 
     const measure = () => {
       const el = viewport ?? root.querySelector<HTMLElement>('[data-slot="aui_thread-viewport"]')
@@ -320,16 +366,26 @@ export function HudShell() {
       }
 
       setFilled(barHeight + visible >= window.innerHeight - 1)
+      root.toggleAttribute('data-hud-band', visible > 0)
+      watchExtras()
+      fitHudWindow(bar, visible, hudResizingRef.current)
     }
 
     // The viewport mounts async (lazy chat surface); poll briefly until it
     // exists, then let the ResizeObserver own it.
     measure()
     const probe = setInterval(measure, 500)
+    const mo = new MutationObserver(() => {
+      watchExtras()
+      measure()
+    })
+    mo.observe(root, { childList: true, subtree: true })
+    mo.observe(document.body, { childList: true })
 
     return () => {
       clearInterval(probe)
       ro.disconnect()
+      mo.disconnect()
     }
   }, [])
 
@@ -342,6 +398,7 @@ export function HudShell() {
   // growth bug); the handle is the one sanctioned way to change size, driving
   // the same flip-resizable-for-the-call pattern the pet overlay uses.
   const { resizing: hudResizing, onPointerDown: onHudResizePointerDown } = useHudResizeHandle()
+  hudResizingRef.current = hudResizing
 
   // Force the HOST layers transparent. index.html's pre-paint script writes an
   // opaque themed background onto <html> as an INLINE style (the anti-white-
@@ -352,15 +409,27 @@ export function HudShell() {
   // bespoke roots, and the HUD needs the same because it is not.
   useEffect(() => {
     const style = document.createElement('style')
-    style.textContent = 'html,body,#root{background:transparent !important;}'
+    style.textContent = 'html,body,#root{background:transparent !important;background-color:transparent !important;}'
     document.head.appendChild(style)
 
-    return () => style.remove()
+    const hosts = [document.documentElement, document.body, document.getElementById('root')]
+    for (const el of hosts) {
+      el?.style.setProperty('background', 'transparent', 'important')
+      el?.style.setProperty('background-color', 'transparent', 'important')
+    }
+
+    return () => {
+      style.remove()
+      for (const el of hosts) {
+        el?.style.removeProperty('background')
+        el?.style.removeProperty('background-color')
+      }
+    }
   }, [])
 
   return (
     <div
-      className="relative flex h-screen w-screen flex-col overflow-hidden"
+      className="relative flex h-screen w-screen flex-col overflow-visible"
       data-hud-edge={edge}
       data-hud-recent={recent || held ? '' : undefined}
       data-hud-shell

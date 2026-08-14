@@ -2315,15 +2315,27 @@ button[data-slot='aui_msg-reactions'] svg {
    pet overlay and quick entry inject a style tag at mount for the same
    reason; HudShell does it too. See `hud-shell.tsx`. */
 
+/* Beat the pre-paint inline html background even if HudShell's style tag
+   has not landed yet. Without this, body keeps --ui-chat-surface-background
+   and the HUD is a smoked rectangle instead of a floating pill. */
+html:has([data-hud-shell]),
+html:has([data-hud-shell]) body,
+html:has([data-hud-shell]) #root {
+  background: transparent !important;
+}
+
 [data-hud-shell] {
   background: transparent;
   /* Arrive decisively and settle; leave gently and get out of the way. Linear
      both directions is what made this feel mechanical. */
   --hud-ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
   --hud-ease-exit: cubic-bezier(0.4, 0, 0.7, 0.2);
+  /* Air around the pill so rounded corners and the focus ring are not sawn
+     off by the window's rectangular HWND. */
+  --hud-bar-inset: 0.75rem;
   /* The band is narrower than the bar, centred under it, so the bar's corner
      controls sit clear of the sheet's edge instead of on top of it. */
-  --hud-band-inset: 0.5rem;
+  --hud-band-inset: calc(var(--hud-bar-inset) + 0.5rem);
   /* Clear space above the composer for the exit chip. */
   --hud-chip-strip: 1.625rem;
 }
@@ -2463,6 +2475,14 @@ button[data-slot='aui_msg-reactions'] svg {
    harmless, being permissive about what lights up is not. */
 [data-hud-shell]:has([data-slot='composer-rich-input']:focus) [data-hud-glass] {
   background: color-mix(in srgb, var(--dt-card) 92%, transparent);
+}
+
+/* Empty transcript: keep the sheet gone even while the composer is focused.
+   The engaged rule above would otherwise raise opacity on a 0-height box and
+   some DWM paths still rasterize it as a smoked strip. */
+[data-hud-shell]:not([data-hud-band]) [data-hud-glass] {
+  opacity: 0 !important;
+  visibility: hidden;
 }
 
 /* Flipped, the sheet hangs from the bar instead of standing on it. */
@@ -2630,7 +2650,7 @@ button[data-slot='aui_msg-reactions'] svg {
    measured from the dock's box, so the band's offset picks the gap up on its
    own instead of needing a second variable kept in sync. */
 [data-hud-shell][data-hud-edge='top'] [data-slot='composer-dock'] {
-  top: 0 !important;
+  top: var(--hud-bar-inset) !important;
   bottom: auto !important;
   padding-top: var(--hud-chip-strip) !important;
 }
@@ -2658,7 +2678,9 @@ button[data-slot='aui_msg-reactions'] svg {
   bottom: auto;
   margin-top: 0.25rem;
   margin-bottom: 0;
-  max-height: calc(100dvh - var(--hud-bar-height, var(--composer-fallback-height)) - 0.75rem);
+  /* Window height hugs the pill, so 100dvh is the bar, not the screen. Cap
+     the list in rem; fitHudWindow grows the HWND to match. */
+  max-height: 16rem;
 }
 
 /* Tighten the thread on every side. The docked chat's gutters (px-6 py-8 plus
@@ -2722,6 +2744,7 @@ button[data-slot='aui_msg-reactions'] svg {
   /* The one surface that is always there, so the one that always takes the
      mouse — everything else in the shell earns it by being on screen. */
   pointer-events: auto;
+  overflow: visible !important;
 }
 
 /* HUD mode is the input and the log — nothing else. The dock stacks
@@ -2763,11 +2786,11 @@ button[data-slot='aui_msg-reactions'] svg {
    stranded at the bottom. */
 [data-hud-shell] [data-slot='composer-dock'],
 [data-hud-shell] [data-slot='composer-dock'][data-popped-out] {
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
+  left: var(--hud-bar-inset) !important;
+  right: var(--hud-bar-inset) !important;
+  bottom: var(--hud-bar-inset) !important;
   top: auto !important;
-  width: 100% !important;
+  width: auto !important;
   max-width: none !important;
   transform: none !important;
   /* Keep this value indirect. Lightning CSS folds literal identity values into
@@ -2776,6 +2799,13 @@ button[data-slot='aui_msg-reactions'] svg {
   --hud-composer-translate: 0;
   translate: var(--hud-composer-translate) !important;
   padding: 0 !important;
+}
+
+[data-hud-shell][data-hud-edge='top'] [data-slot='composer-dock'],
+[data-hud-shell][data-hud-edge='top'] [data-slot='composer-dock'][data-popped-out] {
+  top: var(--hud-bar-inset) !important;
+  bottom: auto !important;
+  padding-top: var(--hud-chip-strip) !important;
 }
 
 /* The bar is never "away". In the docked app the composer dims to 30% while
@@ -2797,6 +2827,7 @@ button[data-slot='aui_msg-reactions'] svg {
      inside its own float. */
   padding: 0 !important;
   width: 100% !important;
+  overflow: visible !important;
 }
 
 /* The composer surface paints fill+glass on itself (not a -z child). HUD forces
@@ -2814,6 +2845,7 @@ button[data-slot='aui_msg-reactions'] svg {
    breathing belongs to the thread and the chat surface; the bar just sits
    there, solid, like Spotlight does. */
 [data-hud-shell] [data-slot='composer-surface'] {
+  overflow: visible !important;
   border: 0 !important;
   /* Same radius as the band's top and the window's own corners, so the HUD
      reads as one object however the band is behaving. Its top corners let a
@@ -2823,25 +2855,33 @@ button[data-slot='aui_msg-reactions'] svg {
   background: var(--dt-card) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  /* Bottom edge only. Enough to lift the bar off whatever it is lying over -
-     without it the HUD reads as pasted onto the other app - and tight enough
-     that it never becomes a glow around a floating card. Ring is the first
-     shadow so the surface edge stays crisp (no border AA dashes). */
   box-shadow:
     0 0 0 1px var(--ui-stroke-secondary),
     0 2px 2px -1px rgb(0 0 0 / 0.12) !important;
-  transition: box-shadow var(--hud-reveal) var(--hud-ease-enter);
 }
 
-/* Focus: the ring the bar already has, in the accent. Everything with its own
-   geometry is out - the bar sits flush against the window, so a ring or a
-   shadow is sawn off by the window before any CSS can shape it, and paying for
-   the clearance moves the bar. Recolouring what is already drawn costs no
-   space, cannot be clipped, and leaves the working arc as the only ring. */
-[data-hud-shell]:has([data-slot='composer-rich-input']:focus) [data-slot='composer-surface'] {
-  box-shadow:
-    0 0 0 1px var(--dt-primary),
-    0 2px 2px -1px rgb(0 0 0 / 0.12) !important;
+/* Same 1px accent ring as before. A second layer fades it in/out so the
+   stroke does not snap by interpolating colour. */
+[data-hud-shell] [data-slot='composer-surface']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px var(--dt-primary);
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+[data-hud-shell]:has([data-slot='composer-rich-input']:focus) [data-slot='composer-surface']::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-hud-shell] [data-slot='composer-surface']::after {
+    transition: none;
+  }
 }
 
 /* Long-press drag armed — the whole bar is the handle until release. */
@@ -2916,7 +2956,7 @@ button[data-slot='aui_msg-reactions'] svg {
 [data-hud-shell] [data-hud-resize] {
   width: 1.25rem;
   height: 1.25rem;
-  cursor: nwse-resize;
+  cursor: ew-resize;
   pointer-events: auto;
   touch-action: none;
 }
