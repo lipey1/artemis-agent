@@ -40,6 +40,17 @@
   src: url('../node_modules/@nous-research/ui/dist/fonts/Collapse-Bold.woff2') format('woff2');
 }
 
+/* Named outside Tailwind `font-*` so tailwind-merge cannot drop Collapse
+   in favor of `font-bold` (same conflict group). */
+.brand-wordmark {
+  font-family: 'Collapse', sans-serif;
+  font-weight: 700;
+  font-style: normal;
+  letter-spacing: 0.08em;
+  line-height: 0.9;
+  text-transform: uppercase;
+}
+
 /* JetBrains Mono — bundled terminal font (Apache-2.0) so bold/italic share the
    regular face's metrics instead of squeezing against a system fallback. */
 @font-face {

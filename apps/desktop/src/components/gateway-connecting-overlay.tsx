@@ -1,17 +1,12 @@
 import { useStore } from '@nanostores/react'
 import { useEffect, useRef, useState } from 'react'
 
-import { BrandMark } from '@/components/brand-mark'
-import { DecodeText } from '@/components/ui/decode-text'
+import { BrandWordmark } from '@/components/brand-wordmark'
 import { Loader2 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { $desktopBoot } from '@/store/boot'
 import { $gatewaySwitching } from '@/store/gateway-switch'
 import { $gatewayState } from '@/store/session'
-
-// Decode mechanics live in the shared <DecodeText> primitive
-// (components/ui/decode-text.tsx). "CONN" stays legible via prefix={4}.
-const TEXT = 'CONNECTING'
 
 // Exit choreography (ms): text fades down + out, hold, then the overlay fades.
 const TEXT_OUT_MS = 360
@@ -161,28 +156,25 @@ export function GatewayConnectingOverlay() {
 
   return (
     <div
+      aria-busy={!overlayHidden || undefined}
       aria-hidden={overlayHidden || undefined}
+      aria-label="Artemis"
       className={cn(
-        'fixed inset-x-0 bottom-0 top-[34px] z-(--z-connecting) grid place-items-center bg-(--ui-chat-surface-background) transition-opacity duration-500 ease-out',
+        'fixed inset-x-0 bottom-0 top-[34px] z-(--z-connecting) grid isolate place-items-center bg-(--ui-chat-surface-background) transition-opacity duration-500 ease-out',
         overlayHidden ? 'pointer-events-none hidden opacity-0' : 'opacity-100'
       )}
       data-connecting-overlay=""
       hidden={overlayHidden}
+      role={overlayHidden ? undefined : 'status'}
     >
       <div
         className={cn(
-          'flex flex-col items-center justify-center gap-5 text-center transition duration-300 ease-out',
+          'flex flex-col items-center justify-center gap-6 text-center transition duration-300 ease-out',
           leaving ? 'translate-y-2 opacity-0 saturate-0' : 'translate-y-0 opacity-100 saturate-100'
         )}
       >
-        <BrandMark className="size-20" />
-        <Loader2 className="size-6 animate-spin text-primary/70" />
-        <DecodeText
-          active={phase === 'live' && (previewing || connecting)}
-          className="pl-[0.4em] text-(--theme-primary)"
-          prefix={4}
-          text={TEXT}
-        />
+        <BrandWordmark blend={false} className="text-[clamp(2.75rem,8vw,4.5rem)]" />
+        <Loader2 aria-hidden className="size-5 animate-spin text-foreground/55" />
       </div>
     </div>
   )

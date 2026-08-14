@@ -123,9 +123,11 @@ function KeyBadge({ char, preview, selected }: { char: string; preview?: boolean
   return (
     <Kbd
       className={cn(
-        'mt-px',
-        selected && 'border-primary bg-primary text-white shadow-none',
-        !selected && preview && 'border-primary text-primary shadow-none'
+        'mt-px shadow-none',
+        selected && 'border-transparent bg-(--theme-primary) text-(--dt-primary-foreground)',
+        !selected &&
+          preview &&
+          'border-transparent bg-[color-mix(in_srgb,var(--theme-primary)_22%,var(--ui-bg-elevated))] text-(--theme-primary)'
       )}
       size="sm"
     >
@@ -173,7 +175,8 @@ function ChoiceButton({
           OPTION_ROW_CLASS,
           'text-(--ui-text-secondary) hover:bg-(--chrome-action-hover) hover:text-(--ui-text-primary)',
           active && 'bg-(--chrome-action-hover) text-(--ui-text-primary)',
-          selected && 'text-(--ui-text-primary)'
+          selected &&
+            'bg-[color-mix(in_srgb,var(--theme-primary)_12%,transparent)] text-(--ui-text-primary)'
         )}
         data-choice
         data-highlighted={active || undefined}

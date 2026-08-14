@@ -257,6 +257,23 @@ describe('ClarifyTool keyboard navigation', () => {
     expect(other.closest('label')?.getAttribute('data-highlighted')).toBe('true')
   })
 
+  it('does not paint the selected letter as a solid primary fill', () => {
+    renderLiveClarify()
+
+    const staging = screen.getByRole('button', { name: /staging/ })
+
+    fireEvent.click(staging)
+
+    const badge = staging.querySelector('[data-slot="kbd"]')
+
+    expect(badge).toBeTruthy()
+    expect(badge?.className).not.toMatch(/\bbg-primary\b/)
+    expect(badge?.className).not.toContain('text-white')
+    expect(badge?.className).toContain('bg-(--theme-primary)')
+    expect(badge?.className).toContain('border-transparent')
+    expect(badge?.className).toContain('text-(--dt-primary-foreground)')
+  })
+
   it('selects by number and confirms the answer with Enter', async () => {
     const request = renderLiveClarify()
 

@@ -225,6 +225,7 @@ import { clearVenvBlockers, formatBlockerMessage, formatProbeFailedMessage } fro
 import { fetchMarketplaceThemes, searchMarketplaceThemes } from './vscode-marketplace'
 import { createWakeIndicatorWindowController } from './wake-indicator-window'
 import { readWindowBelow } from './window-below'
+import { loadWindowUrlWithRetry, reloadWindowContents } from './load-window-url'
 import { installWindowRendererLifecycle } from './window-renderer-lifecycle'
 import { createWindowRevealController } from './window-reveal'
 import {
@@ -368,6 +369,13 @@ let windowsSandboxFallbackReason: SandboxFallbackReason = 'boot-loop'
 let windowsNoSandboxRelaunchAttempted = false
 
 if (IS_WINDOWS) {
+  // Electron 40 can crash the out-of-process Network Service on the first
+  // renderer navigation (dev + remote-debugging-port is a frequent trigger).
+  // After the crash, loadURL keeps returning ERR_FAILED and the window stays
+  // on about:blank (electron/electron#49572). Run the service in-process so
+  // that death cannot leave a black window.
+  app.commandLine.appendSwitch('enable-features', 'NetworkServiceInProcess')
+
   const windowsUserData = app.getPath('userData')
   const priorMarker = readSandboxMarker(windowsUserData)
 
@@ -1333,10 +1341,27 @@ function rememberLog(chunk) {
 
 installCrashForensics({ flush: flushDesktopLogBufferSync, log: rememberLog })
 
-// A rejected loadURL leaves a blank window and, unhandled, no trace anywhere
-// the user can send us. `label` names the surface so the log says which one.
+// A rejected or hung loadURL leaves a blank window. Chromium's network
+// service can crash on first navigation (common on Windows + Electron 40);
+// retry transient failures and an about:blank watchdog instead of sitting
+// on the themed #111111 chrome forever.
+const loadWindowUrlDisposers = new WeakMap()
+
 function loadWindowUrl(win, url, label) {
-  win.loadURL(url).catch(error => rememberLog(`${label} failed to load: ${describeCrashReason(error)}`))
+  loadWindowUrlDisposers.get(win)?.()
+  const dispose = loadWindowUrlWithRetry(win, url, label, {
+    log: rememberLog,
+    describeError: describeCrashReason
+  })
+  loadWindowUrlDisposers.set(win, dispose)
+}
+
+function rendererWindowUrl() {
+  return DEV_SERVER || pathToFileURL(resolveRendererIndex()).toString()
+}
+
+function reloadRendererWindow(win, url, label) {
+  reloadWindowContents(win, url, (target, targetUrl) => loadWindowUrl(target, targetUrl, label))
 }
 
 function openExternalUrl(rawUrl) {
@@ -8686,7 +8711,15 @@ function spawnSecondaryWindow({ sessionId, watch }: { sessionId?: string; watch?
     callbacks: {
       log: rememberLog,
       reload: () => {
-        win.webContents.reload()
+        reloadRendererWindow(
+          win,
+          buildSessionWindowUrl(sessionId, {
+            devServer: DEV_SERVER,
+            rendererIndexPath: DEV_SERVER ? undefined : resolveRendererIndex(),
+            watch
+          }),
+          'Session window'
+        )
       }
     },
     reloadWindowMs: RENDERER_RELOAD_WINDOW_MS,
@@ -8782,7 +8815,7 @@ function createInstanceWindow() {
     callbacks: {
       log: rememberLog,
       reload: () => {
-        win.webContents.reload()
+        reloadRendererWindow(win, rendererWindowUrl(), 'Instance window')
       }
     },
     reloadWindowMs: RENDERER_RELOAD_WINDOW_MS,
@@ -8795,7 +8828,7 @@ function createInstanceWindow() {
   })
 
   attachRendererConsoleCapture(win, 'instance', rememberLog)
-  loadWindowUrl(win, DEV_SERVER || pathToFileURL(resolveRendererIndex()).toString(), 'Instance window')
+  loadWindowUrl(win, rendererWindowUrl(), 'Instance window')
 
   return win
 }
@@ -9734,7 +9767,7 @@ function createWindow() {
     callbacks: {
       log: rememberLog,
       reload: () => {
-        mainWindow.webContents.reload()
+        reloadRendererWindow(mainWindow, rendererWindowUrl(), 'Renderer')
       },
       onCrashLoopSuppressed: details => {
         // #38216 renderer flavor (same recovery as #56726, credit @Sahil-SS9):
@@ -9786,7 +9819,7 @@ function createWindow() {
   // quick-entry windows used to vanish without a trace).
   attachRendererConsoleCapture(mainWindow, 'main', rememberLog)
 
-  loadWindowUrl(mainWindow, DEV_SERVER || pathToFileURL(resolveRendererIndex()).toString(), 'Renderer')
+  loadWindowUrl(mainWindow, rendererWindowUrl(), 'Renderer')
 
   // Start the Python backend NOW, in parallel with the renderer load — not on
   // did-finish-load. The backend cold boot (spawn → port announce → /api/status)

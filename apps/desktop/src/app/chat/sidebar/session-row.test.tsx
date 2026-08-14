@@ -225,6 +225,24 @@ describe('SidebarSessionRow', () => {
     expect(tipTrigger(kebab)).toBeNull()
   })
 
+  it('hides the age while the kebab is showing, including when its menu is open', () => {
+    render(
+      <SidebarSessionRow
+        isPinned={false}
+        isSelected={false}
+        onArchive={noop}
+        onDelete={noop}
+        onPin={noop}
+        onResume={noop}
+        session={makeSession({ title: 'Recent session' })}
+      />
+    )
+
+    const age = screen.getByText('5m')
+    expect(age.className).toContain('group-hover:opacity-0')
+    expect(age.className).toContain('group-has-[[data-row-actions]_[data-state=open]]:opacity-0')
+  })
+
   it('does not render a handoff avatar for a locally-started session', () => {
     const { container } = render(
       <SidebarSessionRow

@@ -61,11 +61,15 @@ interface SidebarSessionRowProps extends React.ComponentProps<'div'> {
 
 const AGE_KEY = { day: 'ageDay', hour: 'ageHour', minute: 'ageMin' } as const
 
-// The last thing in the trailing slot hands its place to the ⋯ button on hover,
-// and is never narrower than the button that has to cover it. A PR chip is the
-// exception while the pointer is on it: it's a link, and the kebab sits
-// absolute over this space, so it has to stop taking clicks too, not just fade.
-const TAIL_HIDES = 'min-w-5 transition-opacity group-hover:opacity-0 group-has-[[data-pr-link]:hover]:opacity-100'
+// The last thing in the trailing slot hands its place to the ⋯ button whenever
+// that button is showing (hover, keyboard focus, or an open menu). Hover alone
+// is not enough: clicking ⋯ moves the pointer into the portaled menu, hover
+// drops, and the age ("now") paints back on top of the still-visible kebab.
+// A PR chip is the exception while the pointer is on it: it's a link, and the
+// kebab sits absolute over this space, so it has to stop taking clicks too,
+// not just fade.
+const TAIL_HIDES =
+  'min-w-5 transition-opacity group-hover:opacity-0 group-has-[[data-row-actions]:focus-within]:opacity-0 group-has-[[data-row-actions]_[data-state=open]]:opacity-0 group-has-[[data-pr-link]:hover]:opacity-100'
 const KEBAB_YIELDS = 'group-has-[[data-pr-link]:hover]:pointer-events-none group-has-[[data-pr-link]:hover]:opacity-0'
 
 function formatAge(seconds: number, r: Translations['sidebar']['row']): string {
