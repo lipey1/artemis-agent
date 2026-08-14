@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "commit": "f77284b0d1c250ce2bb78546279b3c2768b24dd2",
+  "commit": "8db9cc00dc8932adf0df9753454542cf03dc7894",
   "branch": "main",
-  "builtAt": "2026-08-14T13:10:05.603Z",
-  "dirty": false,
+  "builtAt": "2026-08-14T13:29:05.422Z",
+  "dirty": true,
   "source": "local",
-  "version": "0.17.48"
+  "version": "0.17.49"
 }
