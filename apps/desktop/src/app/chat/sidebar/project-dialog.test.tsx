@@ -48,12 +48,16 @@ const { $projectDialog } = vi.hoisted(() => {
   }
 })
 
+const { generateProjectIdea } = vi.hoisted(() => ({
+  generateProjectIdea: vi.fn()
+}))
+
 vi.mock('@/store/projects', () => ({
   $projectDialog,
   addProjectFolder: vi.fn(),
   closeProjectDialog: vi.fn(),
   createProject: vi.fn(),
-  generateProjectIdea: vi.fn(),
+  generateProjectIdea,
   pickProjectFolder: vi.fn(async () => '/Users/test/my-folder'),
   renameProject: vi.fn()
 }))
@@ -83,5 +87,31 @@ describe('ProjectDialog', () => {
 
     const button = await screen.findByRole('button', { name: 'Remove folder' })
     expect(tipTrigger(button)).toBeTruthy()
+  })
+
+  it('locks the idea textarea and shows a generating overlay while inventing', async () => {
+    let resolveIdea!: (value: string) => void
+    generateProjectIdea.mockReturnValueOnce(
+      new Promise<string>(resolve => {
+        resolveIdea = resolve
+      })
+    )
+
+    render(<ProjectDialog />)
+
+    const idea = screen.getByPlaceholderText('What are you building?')
+    expect(idea).not.toBeDisabled()
+    expect(idea.className).toContain('resize-none')
+    expect(idea.className).toContain('dt-portal-scrollbar')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Generate' }))
+
+    expect(idea).toBeDisabled()
+    expect(screen.getByText('Generating…')).toBeTruthy()
+
+    resolveIdea('A SaaS for electrical contractors')
+    await screen.findByDisplayValue('A SaaS for electrical contractors')
+    expect(idea).not.toBeDisabled()
+    expect(screen.queryByText('Generating…')).toBeNull()
   })
 })

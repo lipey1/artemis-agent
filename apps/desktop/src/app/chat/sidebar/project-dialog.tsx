@@ -233,26 +233,38 @@ export function ProjectDialog() {
             <span className="text-[0.6875rem] font-medium text-(--ui-text-tertiary)">{p.ideaLabel}</span>
             <div className="relative">
               <Textarea
-                className="min-h-20 pr-8 text-[0.8125rem]"
-                disabled={submitting}
+                aria-busy={generatingIdea || undefined}
+                className="dt-portal-scrollbar max-h-40 min-h-20 resize-none overflow-y-auto pr-11 text-[0.8125rem]"
+                disabled={submitting || generatingIdea}
                 onChange={event => setIdea(event.target.value)}
                 placeholder={p.ideaPlaceholder}
                 value={idea}
               />
+              {/* Sit left of the themed scrollbar track so the sparkle never
+                  covers the thumb (classic OS gutter used to sit under right-1). */}
               <GenerateButton
-                className="absolute top-1 right-1"
-                disabled={submitting}
+                className="absolute top-1 right-3.5 z-10"
+                disabled={submitting || generatingIdea}
                 generating={generatingIdea}
                 generatingLabel={p.ideaGenerating}
                 label={p.ideaGenerate}
                 onGenerate={() => void generateIdea()}
               />
+              {generatingIdea && (
+                <div
+                  aria-live="polite"
+                  className="absolute inset-0 z-20 flex items-center justify-center gap-1.5 rounded-[2.5px] bg-[color-mix(in_srgb,var(--ui-bg)_72%,transparent)] text-[0.75rem] text-(--ui-text-secondary) backdrop-blur-[1px]"
+                >
+                  <Codicon name="loading" size="0.875rem" spinning />
+                  <span>{p.ideaGenerating}</span>
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-1">
               {templates.map(template => (
                 <button
                   className="flex items-center gap-1 rounded-full border border-(--ui-stroke-tertiary) px-2 py-0.5 text-[0.6875rem] text-(--ui-text-secondary) transition-colors hover:border-(--ui-stroke-secondary) hover:bg-(--ui-control-hover-background) hover:text-foreground disabled:opacity-50"
-                  disabled={submitting}
+                  disabled={submitting || generatingIdea}
                   key={template.label}
                   onClick={() => setIdea(template.idea)}
                   type="button"
@@ -265,7 +277,7 @@ export function ProjectDialog() {
                 <Button
                   aria-label={p.ideaShuffle}
                   className="size-5 text-(--ui-text-quaternary) hover:text-foreground"
-                  disabled={submitting}
+                  disabled={submitting || generatingIdea}
                   onClick={() => setTemplates(randomIdeaTemplates())}
                   size="icon-xs"
                   type="button"
