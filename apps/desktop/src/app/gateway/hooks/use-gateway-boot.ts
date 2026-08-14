@@ -26,7 +26,7 @@ import {
 } from '@/store/gateway'
 import { $gatewaySwitching, wipeSessionListsForGatewaySwitch } from '@/store/gateway-switch'
 import { notify, notifyError } from '@/store/notifications'
-import { $backendUpdateApply, $updateApply } from '@/store/updates'
+import { isUpdateHandoffQuiet } from '@/store/updates'
 import { $activeGatewayProfile, normalizeProfileKey, touchActiveGatewayBackend } from '@/store/profile'
 import {
   $activeSessionId,
@@ -148,7 +148,7 @@ export function useGatewayBoot({
     }
 
     const attemptReconnect = async () => {
-      if (cancelled || reconnecting || gatewayOpen() || $gatewaySwitching.get()) {
+      if (cancelled || reconnecting || gatewayOpen() || $gatewaySwitching.get() || isUpdateHandoffQuiet()) {
         return
       }
 
@@ -209,7 +209,11 @@ export function useGatewayBoot({
             reconnectFailingSince = Date.now()
           }
 
-          if (Date.now() - reconnectFailingSince >= RECONNECT_ESCALATE_AFTER_MS && !escalated) {
+          if (
+            Date.now() - reconnectFailingSince >= RECONNECT_ESCALATE_AFTER_MS &&
+            !escalated &&
+            !isUpdateHandoffQuiet()
+          ) {
             escalated = true
             failDesktopBoot(translateNow('boot.errors.gatewayConnectionLost'))
           }
@@ -220,7 +224,14 @@ export function useGatewayBoot({
     }
 
     function scheduleReconnect() {
-      if (cancelled || reconnecting || reconnectTimer !== null || gatewayOpen() || $gatewaySwitching.get()) {
+      if (
+        cancelled ||
+        reconnecting ||
+        reconnectTimer !== null ||
+        gatewayOpen() ||
+        $gatewaySwitching.get() ||
+        isUpdateHandoffQuiet()
+      ) {
         return
       }
 
@@ -237,7 +248,7 @@ export function useGatewayBoot({
     }
 
     const reconnectNow = () => {
-      if (cancelled || !bootCompleted || $gatewaySwitching.get()) {
+      if (cancelled || !bootCompleted || $gatewaySwitching.get() || isUpdateHandoffQuiet()) {
         return
       }
 
@@ -489,8 +500,9 @@ export function useGatewayBoot({
 
       // Update stops the backend on purpose before handing off. A red
       // "Backend stopped" toast on top of "Restarting Artemis..." looks like
-      // a crash, then the leftover python scan aborts the same click.
-      if ($updateApply.get().applying || $backendUpdateApply.get().applying) {
+      // a crash. `stage === 'restart'` already cleared `applying`, so key off
+      // the hand-off quiet check rather than applying alone.
+      if (isUpdateHandoffQuiet()) {
         return
       }
 

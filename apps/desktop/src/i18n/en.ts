@@ -221,7 +221,8 @@ export const en: Translations = {
     gatewayListenStopping: 'Stopping…',
     gatewayListenStopped: 'Stopped',
     gatewayListenFailed: 'Could not start the gateway.',
-    gatewayListenUnavailable: 'Gateway control is only available in the desktop app.'
+    gatewayListenUnavailable: 'Gateway control is only available in the desktop app.',
+    gatewayListenLoading: 'Checking gateway status…'
   },
 
   keybinds: {

@@ -338,6 +338,7 @@ declare global {
       stopFindInPage: () => Promise<void>
       onFoundInPage: (callback: (result: { activeMatchOrdinal: number; count: number }) => void) => () => void
       listenGateway?: {
+        snapshot: () => Promise<{ host: string; port: number; running: boolean; token: string }>
         status: () => Promise<{ host: string; port: number; running: boolean; token: string }>
         start: (settings: {
           host: string

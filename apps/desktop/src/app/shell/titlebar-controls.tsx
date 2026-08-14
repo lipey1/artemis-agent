@@ -21,7 +21,7 @@ import {
 
 import { appViewForPath, isOverlayView } from '../routes'
 
-import { GatewayListenDialogs, listenGatewayDialogKind } from './gateway-listen-dialog'
+import { GatewayListenDialogs } from './gateway-listen-dialog'
 import {
   TITLEBAR_ICON_BADGE_SCALE,
   titlebarButtonClass,
@@ -110,8 +110,7 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
   const fileBrowserOpen = useStore($fileBrowserOpen)
   const sidebarOpen = useStore($sidebarOpen)
   const [listenGatewayRunning, setListenGatewayRunning] = useState(false)
-  const [listenConfigureOpen, setListenConfigureOpen] = useState(false)
-  const [listenStopOpen, setListenStopOpen] = useState(false)
+  const [listenOpen, setListenOpen] = useState(false)
 
   useEffect(() => {
     const api = window.artemisDesktop?.listenGateway
@@ -119,7 +118,7 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
       return
     }
 
-    void api.status().then(status => setListenGatewayRunning(status.running)).catch(() => {})
+    void api.snapshot().then(status => setListenGatewayRunning(status.running)).catch(() => {})
   }, [])
 
   const toggleHaptics = () => {
@@ -190,24 +189,7 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
       label: t.titlebar.gatewayListen,
       onSelect: () => {
         triggerHaptic('open')
-        const api = window.artemisDesktop?.listenGateway
-        if (!api) {
-          setListenConfigureOpen(true)
-
-          return
-        }
-
-        void api
-          .status()
-          .then(status => {
-            setListenGatewayRunning(status.running)
-            if (listenGatewayDialogKind(status.running) === 'stop') {
-              setListenStopOpen(true)
-            } else {
-              setListenConfigureOpen(true)
-            }
-          })
-          .catch(() => setListenConfigureOpen(true))
+        setListenOpen(true)
       }
     },
     {
@@ -308,13 +290,7 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
         <TitlebarToolButton navigate={navigate} tool={rightSidebarTool} />
       </div>
 
-      <GatewayListenDialogs
-        configureOpen={listenConfigureOpen}
-        onConfigureOpenChange={setListenConfigureOpen}
-        onRunningChange={setListenGatewayRunning}
-        onStopOpenChange={setListenStopOpen}
-        stopOpen={listenStopOpen}
-      />
+      <GatewayListenDialogs onOpenChange={setListenOpen} onRunningChange={setListenGatewayRunning} open={listenOpen} />
     </>
   )
 }

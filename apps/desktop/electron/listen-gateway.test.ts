@@ -4,10 +4,13 @@ import { test } from 'vitest'
 
 import {
   defaultListenGatewaySettings,
-  getListenGatewayStatus,
+  fetchListenGatewayStatus,
+  getListenGatewaySnapshot,
   listenGatewayCliEnv,
+  listenGatewayPidPath,
   listenGatewaySettingsPath,
   normalizeListenGatewaySettings,
+  parseGatewayPidFile,
   parseGatewayStatusOutput,
   startListenGateway,
   stopListenGateway,
@@ -49,17 +52,47 @@ test('parseGatewayStatusOutput: running vs stopped', () => {
   assert.equal(parseGatewayStatusOutput(''), false)
 })
 
-test('getListenGatewayStatus: maps CLI output onto saved settings', async () => {
-  const file = listenGatewaySettingsPath('/home/artemis')
+test('getListenGatewaySnapshot: reads saved settings and the pid file, not the CLI', () => {
+  const settingsFile = listenGatewaySettingsPath('/home/artemis')
+  const pidFile = listenGatewayPidPath('/home/artemis')
   const io = makeIo({
-    files: { [file]: JSON.stringify({ host: '0.0.0.0', port: 18789, token: 'abc' }) },
-    runCli: async () => ({ code: 0, stdout: 'Gateway is running (PID: 9)\n', stderr: '' })
+    files: {
+      [settingsFile]: JSON.stringify({ host: '0.0.0.0', port: 18789, token: 'abc' }),
+      [pidFile]: JSON.stringify({ pid: 9 })
+    },
+    pidAlive: pid => pid === 9,
+    runCli: async () => {
+      throw new Error('snapshot must not spawn Python')
+    }
   })
-  const status = await getListenGatewayStatus(io)
+  const status = getListenGatewaySnapshot(io)
 
   assert.equal(status.running, true)
   assert.equal(status.port, 18789)
   assert.equal(status.token, 'abc')
+})
+
+test('fetchListenGatewayStatus: uses gateway status CLI for running', async () => {
+  const file = listenGatewaySettingsPath('/home/artemis')
+  const io = makeIo({
+    files: { [file]: JSON.stringify({ host: '0.0.0.0', port: 18789, token: 'abc' }) },
+    runCli: async args => {
+      assert.equal(args.join(' '), '-m artemis_cli.main gateway status')
+
+      return { code: 0, stdout: 'Gateway is running (PID: 9)\n', stderr: '' }
+    }
+  })
+  const status = await fetchListenGatewayStatus(io)
+
+  assert.equal(status.running, true)
+  assert.equal(status.token, 'abc')
+})
+
+test('parseGatewayPidFile: json record, bare int, garbage', () => {
+  assert.equal(parseGatewayPidFile('{"pid": 4242}'), 4242)
+  assert.equal(parseGatewayPidFile('4242'), 4242)
+  assert.equal(parseGatewayPidFile(''), null)
+  assert.equal(parseGatewayPidFile('nope'), null)
 })
 
 test('startListenGateway: generates a key, persists settings, and starts', async () => {

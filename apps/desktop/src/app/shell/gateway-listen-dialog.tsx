@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
-import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { CopyButton } from '@/components/ui/copy-button'
 import {
   Dialog,
   DialogContent,
@@ -12,9 +12,27 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useI18n } from '@/i18n'
+import { Loader2 } from '@/lib/icons'
 
 export function listenGatewayDialogKind(running: boolean): 'configure' | 'stop' {
   return running ? 'stop' : 'configure'
+}
+
+export function ensureListenGatewayToken(token: string, generate: () => string): string {
+  const trimmed = token.trim()
+
+  return trimmed || generate()
+}
+
+export function generateListenGatewayToken(): string {
+  const bytes = new Uint8Array(24)
+  crypto.getRandomValues(bytes)
+  let binary = ''
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte)
+  }
+
+  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/u, '')
 }
 
 type ListenGatewayFields = {
@@ -23,6 +41,8 @@ type ListenGatewayFields = {
   token: string
 }
 
+type ListenPhase = 'configure' | 'loading' | 'stop'
+
 const EMPTY_FIELDS: ListenGatewayFields = { host: '0.0.0.0', port: '8642', token: '' }
 
 function readDesktopGateway() {
@@ -30,44 +50,69 @@ function readDesktopGateway() {
 }
 
 export function GatewayListenDialogs({
-  configureOpen,
-  onConfigureOpenChange,
-  stopOpen,
-  onStopOpenChange,
-  onRunningChange
+  onOpenChange,
+  onRunningChange,
+  open
 }: {
-  configureOpen: boolean
-  onConfigureOpenChange: (open: boolean) => void
-  stopOpen: boolean
-  onStopOpenChange: (open: boolean) => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
   onRunningChange?: (running: boolean) => void
 }) {
   const { t } = useI18n()
   const copy = t.titlebar
   const [fields, setFields] = useState<ListenGatewayFields>(EMPTY_FIELDS)
+  const [phase, setPhase] = useState<ListenPhase>('loading')
   const [busy, setBusy] = useState(false)
+  const [started, setStarted] = useState(false)
   const [error, setError] = useState<null | string>(null)
 
   useEffect(() => {
-    if (!configureOpen) {
+    if (!open) {
       return
     }
 
+    let cancelled = false
     setError(null)
     setBusy(false)
+    setStarted(false)
+    setPhase('loading')
+
     const api = readDesktopGateway()
     if (!api) {
+      setPhase('configure')
+      setError(copy.gatewayListenUnavailable)
+
       return
     }
 
-    void api.status().then(status => {
-      setFields({
-        host: status.host,
-        port: String(status.port),
-        token: status.token
+    void api
+      .status()
+      .then(status => {
+        if (cancelled) {
+          return
+        }
+
+        setFields({
+          host: status.host,
+          port: String(status.port),
+          token: status.token
+        })
+        onRunningChange?.(status.running)
+        setPhase(listenGatewayDialogKind(status.running))
       })
-    })
-  }, [configureOpen])
+      .catch(err => {
+        if (cancelled) {
+          return
+        }
+
+        setError(err instanceof Error ? err.message : copy.gatewayListenFailed)
+        setPhase('configure')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [copy.gatewayListenFailed, copy.gatewayListenUnavailable, onRunningChange, open])
 
   async function startGateway() {
     const api = readDesktopGateway()
@@ -84,14 +129,16 @@ export function GatewayListenDialogs({
       return
     }
 
+    const token = ensureListenGatewayToken(fields.token, generateListenGatewayToken)
+    setFields(current => ({ ...current, token }))
     setBusy(true)
     setError(null)
 
     try {
-      const status = await api.start({ host: fields.host.trim(), port, token: fields.token })
+      const status = await api.start({ host: fields.host.trim(), port, token })
       setFields({ host: status.host, port: String(status.port), token: status.token })
+      setStarted(true)
       onRunningChange?.(true)
-      onConfigureOpenChange(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : copy.gatewayListenFailed)
     } finally {
@@ -99,20 +146,53 @@ export function GatewayListenDialogs({
     }
   }
 
-  return (
-    <>
-      <Dialog onOpenChange={open => !busy && onConfigureOpenChange(open)} open={configureOpen}>
-        <DialogContent className="max-w-sm" onInteractOutside={event => busy && event.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle>{copy.gatewayListenTitle}</DialogTitle>
-            <DialogDescription>{copy.gatewayListenDesc}</DialogDescription>
-          </DialogHeader>
+  async function stopGateway() {
+    const api = readDesktopGateway()
+    if (!api) {
+      setError(copy.gatewayListenUnavailable)
 
+      return
+    }
+
+    setBusy(true)
+    setError(null)
+
+    try {
+      await api.stop()
+      onRunningChange?.(false)
+      onOpenChange(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : copy.gatewayListenFailed)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const loading = phase === 'loading'
+
+  return (
+    <Dialog onOpenChange={next => !busy && onOpenChange(next)} open={open}>
+        <DialogContent className="max-w-sm" onInteractOutside={event => busy && event.preventDefault()}>
+        <DialogHeader>
+          <DialogTitle>{phase === 'stop' ? copy.gatewayListenStopTitle : copy.gatewayListenTitle}</DialogTitle>
+          <DialogDescription>
+            {loading ? copy.gatewayListenLoading : phase === 'stop' ? copy.gatewayListenStopBody : copy.gatewayListenDesc}
+          </DialogDescription>
+        </DialogHeader>
+
+        {loading ? (
+          <div className="flex min-h-24 flex-col items-center justify-center gap-2 py-4">
+            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            <p className="text-xs text-muted-foreground">{t.common.loading}</p>
+          </div>
+        ) : phase === 'stop' ? (
+          error ? <p className="text-xs text-destructive">{error}</p> : null
+        ) : (
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1.5">
               <span className="text-[0.6875rem] font-medium text-(--ui-text-tertiary)">{copy.gatewayListenHost}</span>
               <Input
-                disabled={busy}
+                disabled={busy || started}
                 onChange={event => setFields(current => ({ ...current, host: event.target.value }))}
                 value={fields.host}
               />
@@ -120,7 +200,7 @@ export function GatewayListenDialogs({
             <label className="flex flex-col gap-1.5">
               <span className="text-[0.6875rem] font-medium text-(--ui-text-tertiary)">{copy.gatewayListenPort}</span>
               <Input
-                disabled={busy}
+                disabled={busy || started}
                 inputMode="numeric"
                 onChange={event => setFields(current => ({ ...current, port: event.target.value }))}
                 value={fields.port}
@@ -128,46 +208,53 @@ export function GatewayListenDialogs({
             </label>
             <label className="flex flex-col gap-1.5">
               <span className="text-[0.6875rem] font-medium text-(--ui-text-tertiary)">{copy.gatewayListenKey}</span>
-              <Input
-                disabled={busy}
-                onChange={event => setFields(current => ({ ...current, token: event.target.value }))}
-                placeholder={copy.gatewayListenKeyHint}
-                value={fields.token}
-              />
+              <div className="flex items-center gap-1">
+                <Input
+                  className="min-w-0 flex-1"
+                  disabled={busy || started}
+                  onChange={event => setFields(current => ({ ...current, token: event.target.value }))}
+                  placeholder={copy.gatewayListenKeyHint}
+                  value={fields.token}
+                />
+                {fields.token ? (
+                  <CopyButton appearance="icon" buttonSize="icon-xs" className="shrink-0" text={fields.token} />
+                ) : null}
+              </div>
             </label>
             {error ? <p className="text-xs text-destructive">{error}</p> : null}
           </div>
+        )}
 
-          <DialogFooter>
-            <Button disabled={busy} onClick={() => onConfigureOpenChange(false)} type="button" variant="ghost">
+        <DialogFooter>
+          {loading ? (
+            <Button onClick={() => onOpenChange(false)} type="button" variant="ghost">
               {t.common.cancel}
             </Button>
-            <Button disabled={busy} onClick={() => void startGateway()} type="button">
-              {busy ? copy.gatewayListenStarting : copy.gatewayListenStart}
+          ) : phase === 'stop' ? (
+            <>
+              <Button disabled={busy} onClick={() => onOpenChange(false)} type="button" variant="ghost">
+                {t.common.cancel}
+              </Button>
+              <Button disabled={busy} onClick={() => void stopGateway()} type="button" variant="destructive">
+                {busy ? copy.gatewayListenStopping : copy.gatewayListenStop}
+              </Button>
+            </>
+          ) : started ? (
+            <Button onClick={() => onOpenChange(false)} type="button">
+              {t.common.done}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <ConfirmDialog
-        busyLabel={copy.gatewayListenStopping}
-        confirmLabel={copy.gatewayListenStop}
-        description={copy.gatewayListenStopBody}
-        destructive
-        doneLabel={copy.gatewayListenStopped}
-        onClose={() => onStopOpenChange(false)}
-        onConfirm={async () => {
-          const api = readDesktopGateway()
-          if (!api) {
-            throw new Error(copy.gatewayListenUnavailable)
-          }
-
-          await api.stop()
-          onRunningChange?.(false)
-        }}
-        open={stopOpen}
-        title={copy.gatewayListenStopTitle}
-      />
-    </>
+          ) : (
+            <>
+              <Button disabled={busy} onClick={() => onOpenChange(false)} type="button" variant="ghost">
+                {t.common.cancel}
+              </Button>
+              <Button disabled={busy} onClick={() => void startGateway()} type="button">
+                {busy ? copy.gatewayListenStarting : copy.gatewayListenStart}
+              </Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

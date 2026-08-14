@@ -54,6 +54,7 @@ const {
   $updateOverlayTarget,
   requestActiveUpdate,
   resetUpdateApplyState,
+  isUpdateHandoffQuiet,
   startUpdatePoller,
   stopUpdatePoller,
   $updateStatus
@@ -82,6 +83,42 @@ const setRemote = (on: boolean) =>
     logs: [],
     windowButtonPosition: null
   })
+
+describe('isUpdateHandoffQuiet', () => {
+  afterEach(() => {
+    resetUpdateApplyState()
+  })
+
+  it('is false when idle', () => {
+    expect(isUpdateHandoffQuiet()).toBe(false)
+  })
+
+  it('is true while applying', () => {
+    $updateApply.set({
+      applying: true,
+      stage: 'prepare',
+      message: 'Starting update…',
+      percent: null,
+      error: null,
+      command: null,
+      log: []
+    })
+    expect(isUpdateHandoffQuiet()).toBe(true)
+  })
+
+  it('is true on restart even after applying flips false', () => {
+    $updateApply.set({
+      applying: false,
+      stage: 'restart',
+      message: 'Updating Artemis…',
+      percent: 100,
+      error: null,
+      command: null,
+      log: []
+    })
+    expect(isUpdateHandoffQuiet()).toBe(true)
+  })
+})
 
 describe('maybeNotifyUpdateAvailable', () => {
   beforeEach(() => {

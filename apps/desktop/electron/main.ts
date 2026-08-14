@@ -229,7 +229,8 @@ import { loadWindowUrlWithRetry, reloadWindowContents } from './load-window-url'
 import { installWindowRendererLifecycle } from './window-renderer-lifecycle'
 import { createWindowRevealController } from './window-reveal'
 import {
-  getListenGatewayStatus,
+  getListenGatewaySnapshot,
+  fetchListenGatewayStatus,
   startListenGateway,
   stopListenGateway
 } from './listen-gateway'
@@ -9971,7 +9972,8 @@ ipcMain.handle('artemis:backend:touch', async (_event, profile) => {
 ipcMain.handle('artemis:gateway:ws-url', async (_event, profile) => {
   return gatewayWsUrlIpcResult(() => freshGatewayWsUrl(profile))
 })
-ipcMain.handle('artemis:listen-gateway:status', async () => getListenGatewayStatus(createListenGatewayIo()))
+ipcMain.handle('artemis:listen-gateway:snapshot', () => getListenGatewaySnapshot(createListenGatewayIo()))
+ipcMain.handle('artemis:listen-gateway:status', async () => fetchListenGatewayStatus(createListenGatewayIo()))
 ipcMain.handle('artemis:listen-gateway:start', async (_event, payload) =>
   startListenGateway(createListenGatewayIo(), payload)
 )

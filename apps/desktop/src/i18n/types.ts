@@ -264,6 +264,7 @@ export interface Translations {
     gatewayListenStopped: string
     gatewayListenFailed: string
     gatewayListenUnavailable: string
+    gatewayListenLoading: string
   }
 
   keybinds: {

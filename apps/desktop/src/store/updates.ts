@@ -69,6 +69,21 @@ export const resetUpdateApplyState = () => {
   $backendUpdateApply.set(IDLE)
 }
 
+/** True while an in-app update owns the window (including the restart hand-off).
+ *  `stage === 'restart'` is terminal for the overlay close-button, but `applying`
+ *  is already false then, so disconnect toasts must key off this instead. */
+export function isUpdateHandoffQuiet(): boolean {
+  const client = $updateApply.get()
+  const backend = $backendUpdateApply.get()
+
+  return (
+    client.applying ||
+    backend.applying ||
+    client.stage === 'restart' ||
+    backend.stage === 'restart'
+  )
+}
+
 const UPDATE_TOAST_ID = 'desktop-update-available'
 // Time-based snooze instead of per-sha dismissal: this repo lands ~100 commits
 // a day, so a "don't show this exact sha again" guard re-popped the toast on

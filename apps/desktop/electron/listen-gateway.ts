@@ -40,6 +40,7 @@ export type ListenGatewayIo = {
   readFile?: (filePath: string) => string
   writeFile?: (filePath: string, contents: string) => void
   mkdir?: (dirPath: string) => void
+  pidAlive?: (pid: number) => boolean
   runCli: (args: string[], env: Record<string, string>) => Promise<RunCliResult>
   randomToken?: () => string
 }
@@ -88,6 +89,71 @@ export function generateListenGatewayToken(): string {
   return crypto.randomBytes(24).toString('base64url')
 }
 
+export function listenGatewayPidPath(artemisHome: string): string {
+  return path.join(artemisHome, 'gateway.pid')
+}
+
+export function parseGatewayPidFile(raw: string): number | null {
+  const trimmed = String(raw || '').trim()
+  if (!trimmed) {
+    return null
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown
+    if (typeof parsed === 'number' && Number.isInteger(parsed) && parsed > 0) {
+      return parsed
+    }
+
+    if (parsed && typeof parsed === 'object' && 'pid' in parsed) {
+      const pid = Number((parsed as { pid: unknown }).pid)
+      if (Number.isInteger(pid) && pid > 0) {
+        return pid
+      }
+    }
+  } catch {
+    const pid = Number.parseInt(trimmed, 10)
+    if (Number.isInteger(pid) && pid > 0) {
+      return pid
+    }
+  }
+
+  return null
+}
+
+export function isListenGatewayPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+
+    return true
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM'
+  }
+}
+
+export function probeListenGatewayRunning(io: ListenGatewayIo): boolean {
+  const pidFile = listenGatewayPidPath(io.artemisHome)
+  const exists = io.fileExists ?? (filePath => fs.existsSync(filePath))
+  const read = io.readFile ?? (filePath => fs.readFileSync(filePath, 'utf8'))
+  if (!exists(pidFile)) {
+    return false
+  }
+
+  let raw = ''
+  try {
+    raw = read(pidFile)
+  } catch {
+    return false
+  }
+
+  const pid = parseGatewayPidFile(raw)
+  if (pid == null) {
+    return false
+  }
+
+  return (io.pidAlive ?? isListenGatewayPidAlive)(pid)
+}
+
 export function listenGatewayCliEnv(io: ListenGatewayIo, settings: ListenGatewaySettings): Record<string, string> {
   return {
     PYTHONPATH: io.engineRoot,
@@ -131,7 +197,13 @@ function cliFailure(result: RunCliResult): Error {
   return new Error((result.stderr || result.stdout).trim() || `exit ${result.code}`)
 }
 
-export async function getListenGatewayStatus(io: ListenGatewayIo): Promise<ListenGatewayStatus> {
+export function getListenGatewaySnapshot(io: ListenGatewayIo): ListenGatewayStatus {
+  const settings = loadListenGatewaySettings(io)
+
+  return { ...settings, running: probeListenGatewayRunning(io) }
+}
+
+export async function fetchListenGatewayStatus(io: ListenGatewayIo): Promise<ListenGatewayStatus> {
   const settings = loadListenGatewaySettings(io)
   const result = await io.runCli(['-m', 'artemis_cli.main', 'gateway', 'status'], listenGatewayCliEnv(io, settings))
 
